@@ -1,0 +1,59 @@
+{% extends './navbar_login.html' %}
+{% block title %}Login{% endblock %}
+{% block content %}
+{% load dir %}
+<div class="container" style="height:100%">
+  <div class="d-flex justify-content-center">
+    <div class="col-lg-6" style="margin-top:calc( 50vh - 188px )">
+      <div class="card shadow mb-4 animated bounceInUp" >
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+          <h6 class="m-0 font-weight-bold text-primary">Bienvenido</h6>
+          <div class="dropdown no-arrow">
+            <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
+              <div class="dropdown-header">Opciones:</div>
+              <a class="dropdown-item" href="#">¿Olvidaste tu contraseña?</a>
+            </div>
+          </div>
+        </div>
+        <!-- Card Body -->
+        <div class="card-body">
+          <form action="{% url 'login' %}" method="post">
+            {% csrf_token %}
+            <div class="form-group mb-3">
+              <label for="email">Correo electronico:</label>
+              <div class="input-group">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">
+                      <i class="fas fa-user"></i>
+                    </span>
+                  </div>
+                  <input id="email" name="email" type="text" class="form-control {% if messages %} is-invalid {% endif %}" placeholder="">
+                </div>
+                <small id="email" class="form-text text-danger">{{errors.email | error}}</small>
+            </div>
+            <div class="form-group mb-3">
+              <label for="password">Contraseña:</label>
+              <div class="input-group">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">
+                      <i class="fas fa-key"></i>
+                    </span>
+                  </div>
+                  <input id="password" name="password" type="password" class="form-control {% if messages %} is-invalid {% endif %}" placeholder="">
+                </div>
+                <small id="password" class="form-text text-danger">{{errors.password | error}}</small>
+            </div>
+            <button type="submit" class="btn btn-primary float-right">Iniciar sesion</button>
+            <div class="form-text text-danger float-left">
+              <p>{{messages | error}}</p>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

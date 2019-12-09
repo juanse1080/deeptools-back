@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package cnn;
+
+service Server {
+  rpc Run(Input) returns (Output);
+}
+
+message Input {
+  string input_path = 1;
+  string input_file = 2;
+  string output_path = 3;
+  string output_file = 4;
+}
+
+message Output {
+  repeated Vector result = 1;
+  string response = 2;
+  string path = 3;
+}
+
+message Vector {
+  string class_ = 1;
+  float value = 2;
+}

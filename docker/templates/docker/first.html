@@ -1,0 +1,72 @@
+{% extends '../navbar/layout.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+{% load dir %}
+
+<div class="container">
+    <div class="row mb-2">
+        <h3>{{docker.name}}</h3>
+    </div>
+    <div class="row justify-content-center mb-3">
+        <div class="col-lg-7">
+            <div class="row mb-2">
+                <div class="card mb-1">
+                    <img class="card-img-top" src="{{input.value}}" alt="...">
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="card col-12">
+                    <div class="card-body">
+                        {{response.value}}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-body">
+                    <div id="container"></div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+<script>
+    var data = {% autoescape off %}{{graph.value}}{% endautoescape %}
+    console.log(data)
+    Highcharts.chart('container', {
+        chart: {
+            type: 'column'
+        },
+        title: {
+            text: ''
+        },
+        xAxis: {
+            categories: {% autoescape off %}{{categories}}{% endautoescape %}
+        },
+        plotOptions: {
+            series: {
+                borderWidth: 0,
+                dataLabels: {
+                    enabled: true,
+                    format: '{point.y:.1f}%'
+                }
+            }
+        },
+
+        tooltip: {
+            headerFormat: '<span style="font-size:11px">{series.name}</span><br>',
+            pointFormat: '<span style="color:{point.color}">{point.name}</span>: <b>{point.y:.2f}%</b> of total<br/>'
+        },
+
+        series: [
+            {
+                name: 'Class',
+                colorByPoint: true,
+                data
+            }
+        ],
+    });
+</script>
+{% endblock %}
