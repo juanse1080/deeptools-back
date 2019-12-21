@@ -21,7 +21,7 @@ from django.urls import path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    url(r'^dockers/', include('docker.urls')),
+    url(r'^module/', include('module.urls')),
     url(r'^accounts/', include('session.urls')),
 ]
 

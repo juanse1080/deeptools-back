@@ -1,0 +1,327 @@
+{% extends request.user.get_template %}
+{% block title %} Profile {% endblock %}
+{% block content %}
+{% load dir %}
+{% load staticfiles %}
+<style>
+    .owl-theme .owl-nav {
+        margin-top: -10px;
+        text-align: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+</style>
+<div class="container">
+    <form action="{% url 'create_docker' %}" method="POST"  enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="name">Name:</label>
+                    <input type="text" class="form-control{% if errors.name %} is-invalid {% endif %}" id="name" name="name" aria-describedby="emailHelp" placeholder="Enter name proyect">
+                    <small class="form-text text-danger">{{errors.name | error}}</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="img_name">Image name:</label>
+                    <select class="custom-select {% if errors.img_name %} is-invalid {% endif %}" id="img_name" name="img_name">
+                        {% for i in images %}
+                            <option value="{{i}}">{{i}}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-danger">{{errors.img_name | error}}</small>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="languaje">Languaje:</label>
+                    <select class="custom-select {% if errors.languaje %} is-invalid {% endif %}" id="languaje" name="languaje">
+                        <option value="python">Python</option>
+                    </select>
+                    <small class="form-text text-danger">{{errors.languaje | error}}</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="proto_path">Proto file:</label>
+                    <div class="custom-file">
+                        <input type="file" class="custom-file-input {% if errors.proto_path %} is-invalid {% endif %}" id="proto_path" name="proto_path" aria-describedby="inputGroupFileAddon01">
+                        <label class="custom-file-label" for="proto_path">Choose proto file</label>
+                    </div>
+                    <small class="form-text text-danger">{{errors.proto_path | error}}</small>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-12">
+                <label for="proto_path">Elements:</label>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="check_input" checked disabled>
+                            <label for="check_input" class="custom-control-label">Input</label>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="check_output" checked>
+                            <label for="check_output" class="custom-control-label">Output</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="check_response" checked disabled>
+                            <label for="check_response" class="custom-control-label">Response</label>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="check_graph" checked>
+                            <label for="check_graph" class="custom-control-label">Graph</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="owl-carousel owl-theme">
+            <div class="item">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <div class="row mb-1">
+                                    <div class="col-md-6">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Input data">
+                                            <div class="owl-theme into">
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="...">
+                                                    </div>
+                                                </div>
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <video class="card-img-top" controls autoplay muted>
+                                                            <source src="{{input.value}}" type="video/mp4">
+                                                        </video>
+                                                        {% comment %} <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="..."> {% endcomment %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Output data">
+                                            <div class="owl-theme into">
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="...">
+                                                    </div>
+                                                </div>
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <video class="card-img-top" controls autoplay muted>
+                                                            <source src="{{input.value}}" type="video/mp4">
+                                                        </video>
+                                                        {% comment %} <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="..."> {% endcomment %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Response">
+                                            Lorem ipsum dolor sit amet consectetur adipisicing elit. Excepturi quos quam ab facilis esse numquam alias eos, similique accusantium adipisci veritatis incidunt, sapiente magni quaerat ipsum odit hic dolorum magnam.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="" data-toggle="tooltip" data-placement="top" title="Graph">
+                                    <div id="1-pie"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="item"><h4>2</h4></div>
+            <div class="item"><h4>3</h4></div>
+        </div>
+        {% comment %} <div class="row justify-content-center mb-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-7">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <div class="p-1 border border-secondary rounded" data-toggle="tooltip" data-placement="top" title="Input data">
+                                            <div class="card mb-1">
+                                                <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="...">
+                                            </div>
+                                            <select class="custom-select" id="input" name="type">
+                                                <option value="img">Image</option>
+                                                <option value="video">Video</option>
+                                                <option selected value="none">None</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-1 border border-secondary rounded" data-toggle="tooltip" data-placement="top" title="Output data">
+                                            <div class="card mb-1">
+                                                <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="...">
+                                            </div>
+                                            <select class="custom-select" id="output" name="type">
+                                                <option value="img">Image</option>
+                                                <option value="video">Video</option>
+                                                <option selected value="none">None</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="p-1 border border-secondary rounded" data-toggle="tooltip" data-placement="top" title="Response">
+                                            Lorem ipsum dolor sit amet consectetur adipisicing elit. Excepturi quos quam ab facilis esse numquam alias eos, similique accusantium adipisci veritatis incidunt, sapiente magni quaerat ipsum odit hic dolorum magnam.
+                                            <select class="custom-select" id="response" name="type">
+                                                <option value="txt">Text</option>
+                                                <option selected value="none">None</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-5">
+                                <div class="p-1 border border-secondary rounded" data-toggle="tooltip" data-placement="top" title="Graph">
+                                    <div id="container"></div>
+                                    <select class="custom-select" id="graph" name="type">
+                                        <option selected value="none">None</option>
+                                        {% for i in kind %}
+                                            <option value="{{i.0}}">{{i.1}}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> {% endcomment %}
+        <button type="submit" class="btn btn-primary">Submit</button>
+        <div class="form-text text-danger float-right">{{messages | error}}</div>
+    </form>
+    
+    <div class="row mt-3">
+        <div class="col-12">
+            <div id="terminal"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $('.owl-carousel').owlCarousel({
+        loop:true,
+        URLhashListener:true,
+        margin:0,
+        nav:false,
+        mouseDrag : false,
+        dots: false,
+        responsive:{
+            0:{
+                items:1
+            },
+        }
+    });
+
+    $('.into').owlCarousel({
+        loop:true,
+        URLhashListener:true,
+        margin:0,
+        nav:true,
+        dots: false,
+        {% comment %} nav:false,
+        dots: true, {% endcomment %}
+        responsive:{
+            0:{
+                items:1
+            },
+        }
+    });
+
+    var term = new Terminal();
+    term.open(document.getElementById('terminal'));
+    term.write(' $ ');
+    term.on('key', (key, ev) => {
+        console.log(key.charCodeAt(0));
+        if (key.charCodeAt(0) == 13)
+            term.write('\n');
+        term.write(key);
+    });
+
+    $('.custom-select').change(function(){
+        if($(this).val() != 'none'){
+            $(this).parent().removeClass('border-secondary')
+        } else {
+            $(this).parent().addClass('border-secondary')
+        }
+    });
+    Highcharts.chart('1-pie', {
+        chart: {
+            plotBackgroundColor: null,
+            plotBorderWidth: null,
+            plotShadow: false,
+            type: 'pie'
+        },
+        title: {
+            text: 'sjdcbsd',
+            margin: 1
+        },
+        tooltip: {
+            pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
+        },
+        plotOptions: {
+            pie: {
+                allowPointSelect: false,
+                cursor: 'pointer',
+                dataLabels: {
+                    enabled: false
+                },
+                showInLegend: false
+            }
+        },
+        series: [{
+            name: 'Brands',
+            colorByPoint: true,
+            data: [{
+                name: 'Chrome',
+                y: 61.41,
+                sliced: true,
+                selected: true
+            }, {
+                name: 'Internet Explorer',
+                y: 11.84
+            }, {
+                name: 'Firefox',
+                y: 10.85
+            }, {
+                name: 'Edge',
+                y: 4.67
+            }, {
+                name: 'Safari',
+                y: 4.18
+            }, {
+                name: 'Other',
+                y: 7.05
+            }]
+        }]
+    });
+
+</script>
+
+{% endblock %}
