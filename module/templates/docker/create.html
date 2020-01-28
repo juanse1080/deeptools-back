@@ -6,7 +6,7 @@
 <style>
     .owl-theme .owl-nav {
         margin-top: -10px;
-        text-align: center;
+        text-align: right;
         -webkit-tap-highlight-color: transparent;
     }
 </style>
@@ -88,7 +88,7 @@
             </div>
         </div>
         <div class="owl-carousel owl-theme">
-            <div class="item">
+            <div class="item" data-hash="slide1">
                 <div class="card">
                     <div class="card-body">
                         <div class="row">
@@ -143,15 +143,113 @@
                             </div>
                             <div class="col-md-5">
                                 <div class="" data-toggle="tooltip" data-placement="top" title="Graph">
-                                    <div id="1-pie"></div>
+                                    <div id='1-pie'></div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="item"><h4>2</h4></div>
-            <div class="item"><h4>3</h4></div>
+            <div class="item" data-hash="slide2">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <div class="row mb-1">
+                                    <div class="col-md-12">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Input data">
+                                            <div class="owl-theme into">
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="...">
+                                                    </div>
+                                                </div>
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <video class="card-img-top" controls autoplay muted>
+                                                            <source src="{{input.value}}" type="video/mp4">
+                                                        </video>
+                                                        {% comment %} <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="..."> {% endcomment %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Response">
+                                            Lorem ipsum dolor sit amet consectetur adipisicing elit. Excepturi quos quam ab facilis esse numquam alias eos, similique accusantium adipisci veritatis incidunt, sapiente magni quaerat ipsum odit hic dolorum magnam.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="" data-toggle="tooltip" data-placement="top" title="Graph">
+                                    <div id='2-pie'></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="item" data-hash="slide3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="row mb-1">
+                                    <div class="col-md-6">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Input data">
+                                            <div class="owl-theme into">
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="...">
+                                                    </div>
+                                                </div>
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <video class="card-img-top" controls autoplay muted>
+                                                            <source src="{{input.value}}" type="video/mp4">
+                                                        </video>
+                                                        {% comment %} <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="..."> {% endcomment %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Output data">
+                                            <div class="owl-theme into">
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="...">
+                                                    </div>
+                                                </div>
+                                                <div class="item">
+                                                    <div class="card mb-1">
+                                                        <video class="card-img-top" controls autoplay muted>
+                                                            <source src="{{input.value}}" type="video/mp4">
+                                                        </video>
+                                                        {% comment %} <img class="card-img-top" src="{% static 'img/default.jpg' %}" alt="..."> {% endcomment %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="" data-toggle="tooltip" data-placement="top" title="Response">
+                                            Lorem ipsum dolor sit amet consectetur adipisicing elit. Excepturi quos quam ab facilis esse numquam alias eos, similique accusantium adipisci veritatis incidunt, sapiente magni quaerat ipsum odit hic dolorum magnam.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         {% comment %} <div class="row justify-content-center mb-3">
             <div class="col-12">
@@ -225,9 +323,9 @@
 </div>
 
 <script>
-    $('.owl-carousel').owlCarousel({
+    let owl = $('.owl-carousel')
+    owl.owlCarousel({
         loop:true,
-        URLhashListener:true,
         margin:0,
         nav:false,
         mouseDrag : false,
@@ -239,9 +337,21 @@
         }
     });
 
+    $('.custom-control-input').click(function(){
+        graph = $('#check_graph').prop('checked')
+        output = $('#check_output').prop('checked')
+        console.log(graph, output)
+        if (graph && output){
+            location.hash = 'slide1'
+        } else if(graph && !output){
+            location.hash = 'slide2'
+        } else if(!graph && output){
+            location.hash = 'slide3'
+        }
+    })
+
     $('.into').owlCarousel({
         loop:true,
-        URLhashListener:true,
         margin:0,
         nav:true,
         dots: false,
@@ -279,7 +389,7 @@
             type: 'pie'
         },
         title: {
-            text: 'sjdcbsd',
+            text: 'Graph',
             margin: 1
         },
         tooltip: {
@@ -321,7 +431,56 @@
             }]
         }]
     });
-
+    Highcharts.chart('2-pie', {
+        chart: {
+            plotBackgroundColor: null,
+            plotBorderWidth: null,
+            plotShadow: false,
+            type: 'pie'
+        },
+        title: {
+            text: 'Graph',
+            margin: 1
+        },
+        tooltip: {
+            pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
+        },
+        plotOptions: {
+            pie: {
+                allowPointSelect: false,
+                cursor: 'pointer',
+                dataLabels: {
+                    enabled: false
+                },
+                showInLegend: false
+            }
+        },
+        series: [{
+            name: 'Brands',
+            colorByPoint: true,
+            data: [{
+                name: 'Chrome',
+                y: 61.41,
+                sliced: true,
+                selected: true
+            }, {
+                name: 'Internet Explorer',
+                y: 11.84
+            }, {
+                name: 'Firefox',
+                y: 10.85
+            }, {
+                name: 'Edge',
+                y: 4.67
+            }, {
+                name: 'Safari',
+                y: 4.18
+            }, {
+                name: 'Other',
+                y: 7.05
+            }]
+        }]
+    });
 </script>
 
 {% endblock %}
