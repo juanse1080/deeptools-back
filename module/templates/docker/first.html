@@ -26,8 +26,7 @@
         <div class="col-lg-5 mb-5">
             <div class="">
                 <div class="card">
-                    <div class="card-body">
-                        <div id="container"></div>
+                    <div class="card-body" id="graphs">
                     </div>
                 </div>
             </div>
@@ -46,40 +45,14 @@
     </div>
 </div>
 <script>
-    var data = {% autoescape off %}{{graph.value}}{% endautoescape %}
+    var data = {% autoescape off %}{{graph}}{% endautoescape %}
     console.log(data)
-    Highcharts.chart('container', {
-        chart: {
-            type: 'column'
-        },
-        title: {
-            text: ''
-        },
-        xAxis: {
-            categories: {% autoescape off %}{{categories}}{% endautoescape %}
-        },
-        plotOptions: {
-            series: {
-                borderWidth: 0,
-                dataLabels: {
-                    enabled: true,
-                    format: '{point.y:.1f}%'
-                }
-            }
-        },
-
-        tooltip: {
-            headerFormat: '<span style="font-size:11px">{series.name}</span><br>',
-            pointFormat: '<span style="color:{point.color}">{point.name}</span>: <b>{point.y:.2f}%</b> of total<br/>'
-        },
-
-        series: [
-            {
-                name: 'Class',
-                colorByPoint: true,
-                data
-            }
-        ],
-    });
+    for (item in data){
+        html = ''+
+            '<div id="container'+item+'"></div>'
+        $('#graphs').append(html)
+        Highcharts.chart('container'+item, data[item]);
+    }
+    
 </script>
 {% endblock %}

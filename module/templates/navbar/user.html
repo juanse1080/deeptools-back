@@ -21,13 +21,7 @@
     <!-- Custom styles for this template-->
     <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
 
-    {% comment %} OwlCarousel core css{% endcomment %}
-    <link href="{% static 'css/owl.carousel.css' %}" rel="stylesheet">
-    <link href="{% static 'css/owl.theme.default.css' %}" rel="stylesheet">
-
     <link rel="stylesheet" type="text/css" href="https://www.highcharts.com/media/com_demo/css/highslide.css" />
-
-    
 
     <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
@@ -46,9 +40,11 @@
     <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 
-    {% comment %} OwlCarousel core Javascript{% endcomment %}
-    <script src="{% static 'vendor/owl/owl.carousel.js' %}"></script>
+    {% comment %} utils core Javascript{% endcomment %}
+    <script src="{% static 'js/utils.js' %}"></script>
 
+    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"/>
+    <script type="text/javascript" src="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
 
     <!-- Core plugin JavaScript-->
     <script src="{% static 'vendor/jquery-easing/jquery.easing.min.js' %}"></script>

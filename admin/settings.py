@@ -136,3 +136,5 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 AUTH_USER_MODEL = 'module.User'
+
+ENV_ROOT = '/home/juanmarcon/Documentos/Project/django/lib/python3.6/site-packages/'

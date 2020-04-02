@@ -1,0 +1,293 @@
+{% extends request.user.get_template %}
+{% block title %} Profile {% endblock %}
+{% block content %}
+{% load dir %}
+{% load staticfiles %}
+
+<style>
+    .badge{
+        padding-right: 0.35em;
+    }
+
+</style>
+<div class="modal fade bd-example-modal-lg" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="row justify-content-center">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="name">Name:</label>
+                            <input type="text" class="form-control" id="name_serie" aria-describedby="emailHelp" placeholder="Enter name serie">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="img_name">Type:</label>
+                            <select class="custom-select" id="type_serie">
+                                <option value="column">Column</option>
+                                <option value="bar">Bar</option>
+                                <option value="spline">Spline</option>
+                                <option value="pie">Pie</option>
+                                <option value="area">Area</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="addSerie(this)" data-dismiss="modal" id="create_graph" item="0">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="container" class="container">
+    <div id="item0" class="p-2 rounded mt-2 border" style="background-color:#fff;position:relative">
+        <button class="btn btn-sm btn-danger rounded-pill" onclick="deleteGraph(this)" item="0" style="position:absolute; right:7px;bottom: 7px;z-index:99">
+            <i class="fas fa-trash"></i>
+        </button>
+        <div class="row justify-content-between m-1">
+            <div class="col-md-7">
+                <div id="badges0">
+                    <span class="badge badge-pill badge-primary">
+                        Bar
+                        <i class="fas fa-times-circle" onclick="deleteSerie(this)" style="cursor: pointer;" item="0"></i>
+                    </span>
+                </div>
+                <div id="graph0"></div>
+            </div>
+            <div class="col-md-5">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label for="name">Title:</label>
+                            <input type="text" class="form-control" id="title0" item="0" onkeyup="change(this, {title:{text:this.value}})" aria-describedby="emailHelp" placeholder="Enter title">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="form-group">
+                            <label for="name">Subtitle:</label>
+                            <input type="text" class="form-control" id="subtitle0" item="0" onkeyup="change(this, {subtitle:{text:this.value}})" aria-describedby="emailHelp" placeholder="Enter subtitle">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label for="name">Axis X:</label>
+                            <input type="text" class="form-control" id="x0" item="0" onkeyup="change(this,{
+                                xAxis:{
+                                    title:{
+                                        text:this.value
+                                    }
+                                }
+                            })" aria-describedby="emailHelp" placeholder="Enter name axis x">
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-group">
+                            <label for="name">Axis Y:</label>
+                            <input type="text" class="form-control" id="y0" item="0" onkeyup="change(this,{
+                                yAxis:{
+                                    title:{
+                                        text:this.value
+                                    }
+                                }
+                            })" aria-describedby="emailHelp" placeholder="Enter name axis y">
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <button class="btn btn-sm btn-primary rounded-pill mb-5" onclick="showModal(this)" item="0">
+                        <span>
+                            <i class="fas fa-plus"></i>
+                        </span>
+                        Add serie
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="text-align: right;" class="mt-3">
+        <button class="btn btn-sm btn-primary" id="add_graph">
+            <span><i class="fas fa-plus"></i></span> Add graph
+        </button>
+    </div>
+</div>
+<div class="container">
+    <div class="row justify-content-end">
+        <div class="col-12">
+            <button class="btn btn-success" id="submit">Create</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chart = []
+    chart[0] = Highcharts.chart('graph0', {
+        title: {
+            text: 'Combination chart'
+        },
+        series :[{
+            type: 'column',
+            name: 'Example',
+            data: [2, 3, 5, 7, 6]
+        }]
+    })
+
+    change = (e, option) => {
+        item = $(e).attr('item')
+        chart[$('#item'+item).prevAll().length].update(option)
+    }
+
+    function addSerie(e) {
+        colors = initial()
+        name = $('#name_serie').val()
+        type = $('#type_serie').val()
+        item = $(e).attr('item')
+        $('#badges'+item).append(
+            "<span class='badge badge-pill badge-primary m-1' style='background-color:"+colors[0]+"'>"+
+                "<span style='color:"+colors[1]+"'>"+ name +" </span>"+
+                "<i style='color:"+colors[1]+";cursor: pointer;' class='fas fa-times-circle' onclick='deleteSerie(this)' item='"+item+"' ></i>"+
+            "</span>"
+        )
+        chart[item].addSeries({
+            type: type,
+            name: name,
+            data: [2, 3, 5, 7, 6],
+            color: colors[0]
+        })
+    }
+
+    function deleteSerie(e){    
+        index = $(e).parent().prevAll().length
+        chart[$(e).attr('item')].series[index].remove()
+        $(e).parent().remove()
+    }
+
+    function showModal(e){
+        $('#name_serie').val('')
+        $('#create_graph').attr('item', $(e).attr('item'))
+        $('#exampleModalCenter').modal('show')
+    }
+
+    function deleteGraph(e){
+        parent = $('#item'+$(e).attr('item'))
+        item = parent.prevAll().length
+        parent.fadeOut()
+        parent.remove()
+        chart.splice(item, 1)
+    }
+
+    $('#submit').click(function(){
+        const options = chart.map(function(obj){
+            temp = obj.options
+            temp.series = obj.series.map(function(serie){
+                return serie.userOptions
+            })
+            return temp
+        })
+        const csrfmiddlewaretoken = $('[name="csrf"]').attr('content');
+        console.log(csrfmiddlewaretoken)
+        const jsonContent = JSON.stringify(options);
+        $.ajax({
+            url: "{% url 'graph' docker_id=id %}",
+            type: "POST",
+            dataType: "json",
+            data: {
+                jsonContent,
+                csrfmiddlewaretoken,
+            },
+            success: function(data) {
+                location.href = "{% url 'run_process' docker_id=id %}"
+            }
+
+        })
+    })
+
+    $('#add_graph').click(function(){
+        index = $(this).parent().prevAll().length    
+        html = ''+
+        '<div id="item'+index+'" class="p-2 rounded mt-2 border" style="background-color:#fff;position:relative">'+
+            '<button class="btn btn-sm btn-danger rounded-pill" onclick="deleteGraph(this)" item="'+index+'" style="position:absolute;right:7px;bottom: 7px;z-index:99">'+
+                '<span>'+
+                    '<i class="fas fa-trash"></i>'+
+                '</span>'+
+            '</button>'+
+            '<div class="row justify-content-between m-1">'+
+                '<div class="col-md-7">'+
+                    '<div id="badges'+index+'">'+
+                        '<span class="badge badge-pill badge-primary">'+
+                            'Bar '+
+                            '<i class="fas fa-times-circle" onclick="deleteSerie(this)" item="'+index+'" style="cursor: pointer;" ></i>'+
+                        '</span>'+
+                    '</div>'+
+                    '<div id="graph'+index+'"></div>'+
+                '</div>'+
+                '<div class="col-md-5">'+
+                    '<div class="row">'+
+                        '<div class="col-12">'+
+                            '<div class="form-group">'+
+                                '<label for="name">Title:</label>'+
+                                '<input type="text" class="form-control" id="title'+index+'" item="'+index+'" onkeyup="change(this, {title:{text:this.value}})" aria-describedby="emailHelp" placeholder="Enter title">'+
+                            '</div>'+
+                        '</div>'+
+                    '</div>'+
+                    '<div class="row">'+
+                        '<div class="col-12">'+
+                            '<div class="form-group">'+
+                                '<label for="name">Subtitle:</label>'+
+                                '<input type="text" class="form-control" id="subtitle'+index+'" item="'+index+'" onkeyup="change(this, {subtitle:{text:this.value}})" aria-describedby="emailHelp" placeholder="Enter subtitle">'+
+                            '</div>'+
+                        '</div>'+
+                    '</div>'+
+                    '<div class="row">'+
+                        '<div class="col-6">'+
+                            '<div class="form-group">'+
+                                '<label for="name">Axis X:</label>'+
+                                '<input type="text" class="form-control" id="x'+index+'" item="'+index+'" onkeyup="change(this,{xAxis:{title:{text:this.value}}})" aria-describedby="emailHelp" placeholder="Enter name axis x">'+
+                            '</div>'+
+                        '</div>'+
+                        '<div class="col-6">'+
+                            '<div class="form-group">'+
+                                '<label for="name">Axis Y:</label>'+
+                                '<input type="text" class="form-control" id="y'+index+'" item="'+index+'" onkeyup="change(this,{yAxis:{title:{text:this.value}}})" aria-describedby="emailHelp" placeholder="Enter name axis y">'+
+                            '</div>'+
+                        '</div>'+
+                    '</div>'+
+                    '<div style="text-align: right;">'+
+                        '<button class="btn btn-sm btn-primary rounded-pill mb-5" onclick="showModal(this)" item="'+index+'">'+
+                            '<span>'+
+                                '<i class="fas fa-plus"></i>'+
+                            '</span> '+
+                            'Add serie'
+                        '</button>'+
+                    '</div>'+
+                '</div>'+
+            '</div>'+
+        '</div>'
+        if(index > 0){
+            $('#item'+(index-1)).after(html)
+        } else {
+            $(this).parent().before(html)
+        }
+        chart[index] = Highcharts.chart('graph'+index, {
+            title: {
+                text: 'Combination chart'
+            },
+            series :[{
+                type: 'column',
+                name: 'Example',
+                data: [2, 3, 5, 7, 6]
+            }]
+        })
+        
+    })
+    
+
+
+</script>
+
+{% endblock %}

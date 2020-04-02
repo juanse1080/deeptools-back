@@ -2,9 +2,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from django.http import JsonResponse
 from django.contrib import messages
 
-import docker
+import docker as docker_env
 import json
 import sys
 import os
@@ -74,20 +75,39 @@ def create_usr(request):
     ana.save()
     return render(request, 'docker/run_process.html')
 
+def graph(request, docker_id):
+    if request.method == "POST":
+        docker = Docker.objects.get(id=docker_id)
+        print(request.POST.get('jsonContent'))
+        with open('%s/%s/graph.json' % (settings.MEDIA_ROOT, docker.img_name), 'w') as f:
+            json.dump(request.POST.get('jsonContent'), f)
+        return JsonResponse({'success': True})
+    return render(request, 'docker/graph.html', {'id':docker_id})
 
 @login_required
 def create_docker(request):
-    client = docker.from_env()
+    client = docker_env.from_env()
     images = [i.tags[0].split(':')[0] for i in client.images.list() if i.tags]
     if request.method == "POST":
         form = DockerForm(request.POST, request.FILES)
         if form.is_valid():
             data = form.cleaned_data
+
+            # docker = Docker(
+            #     name = data['name'],
+            #     ip = created_port(docker_.id),
+            #     languaje = data['languaje'],
+            #     proto_path = data['proto_path'].name,
+            #     base_path = '%s%s' % (settings.MEDIA_URL, paths['img_name']),
+            #     img_name = paths['img_name'],
+            #     user_id = request.user
+            # )
+
             paths = {'media': settings.MEDIA_ROOT, 'img_name': request.POST.get(
                 'img_name').lower(), 'proto': data['proto_path'].name}
-            query_copy = request.POST.copy()
 
             docker_ = form.save()
+            docker_.img_name = paths['img_name']
             docker_.user = request.user
             docker_.base_path = '%s%s' % (
                 settings.MEDIA_URL, paths['img_name'])
@@ -104,9 +124,8 @@ def create_docker(request):
                 terminal_out(
                     "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(img_name)s --grpc_python_out=%(media)s/%(img_name)s %(img_name)s/%(proto)s" % paths)
                 shutil.move('%(media)s/%(img_name)s/%(img_name)s' % paths,
-                            '/home/juanmarcon/Documents/Project/django/lib/python3.7/site-packages/')
-                client.containers.run(image=paths['img_name'], command='python server.py', detach=True, name=docker_.img_name, ports={
-                                      50051: paths['ip']}, remove=True, volumes={'%(media)s/%(img_name)s/experiments' % paths: {'bind': '/media', 'mode': 'rw'}})
+                            '/home/juanmarcon/Documentos/Project/django/lib/python3.6/site-packages/')
+                client.containers.run(image=paths['img_name'], command='python server.py', detach=True, name=docker_.img_name, ports={50051: paths['ip']}, remove=True, volumes={'%(media)s/%(img_name)s/experiments' % paths: {'bind': '/media', 'mode': 'rw'}})
 
                 # terminal_out("sudo docker run -d --rm --name %(img_name)s -p %(ip)s:50051 -v %(media)s/%(img_name)s/experiments:/media %(img_name)s:latest python server.py" % paths)
             except Exception as e:
@@ -115,17 +134,21 @@ def create_docker(request):
             docker_.proto_path = data['proto_path'].name
             docker_.save()
 
-            for item, value in enumerate(query_copy.pop('type')):
-                print(item, value)
+            elements_ = request.POST.getlist('type')
+
+            for item, value in enumerate(elements_):
                 if value != 'none':
                     ElementType.objects.create(
                         kind=value,
                         docker=docker_,
                         element=Element.objects.get(id=item+1),
                     )
+            if 'graph' in elements_:
+                return redirect('graph', docker_id=docker_.id)
             return redirect('run_process', docker_id=docker_.id)
         return render(request, 'docker/create.html', {'errors': form.errors, 'kind': GraphType.kind_choices, 'images': images})
     return render(request, 'docker/create.html', {'kind': GraphType.kind_choices, 'images': images})
+    # return render(request, 'docker/create_form.html', {'kind': GraphType.kind_choices, 'images': images})
 
 
 @login_required
@@ -181,23 +204,6 @@ def run_process(request, docker_id):
 
             elements = [i.element.name for i in docker.elements_type.all()]
             
-            print(response)
-
-            if 'graph' in elements:
-                data_graph = [{'name': resp.class_, 'y': resp.value}
-                              for resp in response.result]
-
-                graph_type = GraphType.objects.all().filter(
-                    name=docker.elements_type.all().filter(element__name='graph')[0].kind)[0]
-
-                for i in data_graph:
-                    Graph.objects.create(
-                        x=i['name'],
-                        y=i['y'],
-                        experiment=experiment,
-                        kind=graph_type
-                    )
-
             if 'output' in elements:
                 output_path = '%s%s/experiments/user_%s/%s/output/%s' % (
                     settings.MEDIA_URL, docker.img_name, request.user.id_card, experiment.id, response.path)
@@ -213,6 +219,17 @@ def run_process(request, docker_id):
 
             experiment.save()
 
+            if 'graph' in elements:
+                for graph in response.result:
+                    graph_ = Graph(experiment=experiment)
+                    graph_.save()
+                    for serie in graph.serie:
+                        serie_ = Serie(graph=graph_)
+                        serie_.save()
+                        for vector in serie.vector:
+                            point_ = Point(x=vector.value[0], y=vector.value[1], serie=serie_)
+                            point_.save()
+                        
             return redirect('show_experiments', docker_id=docker.id, experiment_id=experiment.id)
     return render(request, 'docker/run.html', {'docker': docker})
 
@@ -232,19 +249,18 @@ def show_experiments(request, docker_id, experiment_id):
     view = {'elements': elements, 'docker': docker, 'experiment': int(experiment_id)}
 
     if 'graph' in elements:
-        data_graph = [{'name': graph.x, 'y': graph.y}
-                      for graph in experiment.graphs.all()]
 
-        update_data(
-            view,
-            'graph',
-            experiment.graphs.all()[0].kind.name,
-            data_graph
-        )
-        
-        view.update(
-            {'categories': [graph.x for graph in experiment.graphs.all()]})
-        
+        with open('%s/%s/graph.json' % (settings.MEDIA_ROOT, docker.img_name)) as json_file:
+            data = json_file.read()
+            json_ = json.loads(data)
+            temp = json.loads(json_)
+
+        for i, graph in enumerate(experiment.graphs.all()):
+            for j, serie in enumerate(graph.series.all()):
+                temp[i]['series'][j]['data'] = [[point.x, point.y] for point in serie.points.all()]
+        options = json.dumps(temp)
+        view.update({'graph':options})
+
     if 'output' in elements:
         update_data(
             view,

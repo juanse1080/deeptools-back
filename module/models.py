@@ -2,10 +2,14 @@ from django.db import models
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.utils.translation import ugettext_lazy as _
-
+from django.conf import settings
+from .utils import *
 from .managers import UserManager
+import shutil
 
 # Create your models here.
+
+
 class User(AbstractBaseUser, PermissionsMixin):
 
     role_choices = (
@@ -20,11 +24,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=35)
     last_name = models.CharField(max_length=35)
     email = models.CharField(max_length=60, unique=True)
-    timestamp = models.DateTimeField(auto_now=True)   
+    timestamp = models.DateTimeField(auto_now=True)
     is_staff = models.BooleanField(
         _('staff status'),
         default=False,
-        help_text=_('Designates whether the user can log into this admin site.'),
+        help_text=_(
+            'Designates whether the user can log into this admin site.'),
     )
     is_active = models.BooleanField(
         _('active'),
@@ -61,12 +66,12 @@ class User(AbstractBaseUser, PermissionsMixin):
                     This is the fist name
         """
         return self.first_name
-    
+
     def get_template(self):
         template = {
-            'admin':'navbar/layout.html',
-            'creator':'navbar/layout.html',
-            'user':'navbar/user.html'
+            'admin': 'navbar/layout.html',
+            'creator': 'navbar/layout.html',
+            'user': 'navbar/user.html'
         }
         return template[self.role]
 
@@ -94,13 +99,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         """
         return self.__dict__
 
+
 class Docker(models.Model):
     lenguaje_choices = (
         ('python', 'Python'),
     )
     name = models.CharField(max_length=100, unique=True)
     ip = models.CharField(max_length=15, unique=True, null=True)
-    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE, related_name='owner')
+    user = models.ForeignKey(
+        User, null=True, on_delete=models.CASCADE, related_name='owner')
     languaje = models.CharField(max_length=100, choices=lenguaje_choices)
     proto_path = models.CharField(max_length=500, null=True)
     base_path = models.CharField(max_length=500, null=True)
@@ -108,15 +115,80 @@ class Docker(models.Model):
 
     def get_proto_name(self):
         return self.proto_path.split('.')[0]
-    
+
     def get_experiments(self):
         return self.experiments.order_by('id')
-    
+
     def get_last_experiment(self):
         return self.experiments.order_by('-id')[0]
-    
+
     def have_experiments(self):
         return len(self.experiments.all()) > 0
+
+    def get_path(self):
+        return '%s/%s' % (settings.MEDIA_ROOT, self.img_name.lower())
+
+    def create_folders(self):
+        os.makedirs(self.get_path(), 0o777)
+
+    def create_docker(self, file, client):
+        try:
+            self.create_folders()
+            handle_uploaded_file(file, '%(media)s/%(img_name)s' % (settings.MEDIA_ROOT, self.img_name.lower()))
+            terminal_out(
+                "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(img_name)s --grpc_python_out=%(media)s/%(img_name)s %(img_name)s/%(proto)s" % { 
+                    'media': settings.MEDIA_ROOT, 
+                    'img_name': self.img_name.lower(), 
+                    'proto':  self.proto_path
+                }
+            )
+            shutil.move('%(media)s/%(img_name)s/%(img_name)s' % {
+                    'media': settings.MEDIA_ROOT, 'img_name': self.img_name.lower()
+                },
+                settings.ENV_ROOT
+            )
+            self.container = client.containers.run(
+                image=self.img_name, 
+                command='python server.py', 
+                detach=True, 
+                name=self.img_name, 
+                ports={50051: self.port}, 
+                remove=True, 
+                volumes={
+                    '%s/%s/experiments' % (settings.MEDIA_ROOT, self.img_name): {
+                        'bind': '/media', 'mode': 'rw'
+                    }
+                }
+            )
+        except expression as identifier:
+            self.delete_model()
+            return False
+        return True
+
+    def delete_model(self, delete_img=False):
+        shutil.rmtree('%s/%s' (
+            settings.MEDIA_ROOT, self.img_name.lower()
+        ))
+        shutil.rmtree('%s/%s' % (
+            settings.ENV_ROOT, self.img_name.lower()
+        ))
+        self.container.stop()
+        self.delete()
+            
+        
+
+
+
+    # def create_folder(self):
+    #     os.makedirs('%s/%s/experiments/user_%s/%s/input' % (settings.MEDIA_ROOT,
+    #                                                         self.img_name, request.user.id_card, experiment.id), 0o777)
+    #     os.makedirs('%s/%s/experiments/user_%s/%s/output' % (settings.MEDIA_ROOT,
+    #                                                             self.img_name, request.user.id_card, experiment.id), 0o777)
+
+    def create_folder_docker(self):
+        path = '%(media)s/%(img_name)s/experiments' % paths
+        os.makedirs(path, 0o777)
+
 
 class ElementType(models.Model):
     kind_choices = (
@@ -126,19 +198,25 @@ class ElementType(models.Model):
         ('graph', 'Graph'),
     )
     kind = models.CharField(max_length=30, choices=kind_choices)
-    docker = models.ForeignKey(Docker, null=False, blank=False, on_delete=models.CASCADE, related_name='elements_type')
-    element = models.ForeignKey('Element', null=False, blank=False, on_delete=models.CASCADE, related_name='types')
+    docker = models.ForeignKey(Docker, null=False, blank=False,
+                               on_delete=models.CASCADE, related_name='elements_type')
+    element = models.ForeignKey(
+        'Element', null=False, blank=False, on_delete=models.CASCADE, related_name='types')
+
 
 class Element(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    
+
 
 class Experiment(models.Model):
-    user = models.ForeignKey(User, null=True, blank=False, on_delete=models.CASCADE, related_name='experiments')
-    docker = models.ForeignKey(Docker, null=True, blank=False, on_delete=models.CASCADE, related_name='experiments')
+    user = models.ForeignKey(User, null=True, blank=False,
+                             on_delete=models.CASCADE, related_name='experiments')
+    docker = models.ForeignKey(Docker, null=True, blank=False,
+                               on_delete=models.CASCADE, related_name='experiments')
     input_file = models.CharField(max_length=500, null=True)
     output_file = models.CharField(max_length=500, null=True)
     response = models.CharField(max_length=1000, null=True)
+
 
 class GraphType(models.Model):
     kind_choices = (
@@ -147,8 +225,19 @@ class GraphType(models.Model):
     )
     name = models.CharField(max_length=30, choices=kind_choices)
 
+
 class Graph(models.Model):
-    x = models.CharField(max_length=100)
-    y = models.FloatField(max_length=100)
-    experiment = models.ForeignKey(Experiment, null=False, blank=False, on_delete=models.CASCADE, related_name='graphs')
-    kind = models.ForeignKey(GraphType, null=False, blank=False, on_delete=models.CASCADE, related_name='graphs')
+    experiment = models.ForeignKey(
+        Experiment, null=False, blank=False, on_delete=models.CASCADE, related_name='graphs')
+
+
+class Serie(models.Model):
+    graph = models.ForeignKey(
+        Graph, null=False, blank=False, on_delete=models.CASCADE, related_name='series')
+
+
+class Point(models.Model):
+    serie = models.ForeignKey(
+        Serie, null=False, blank=False, on_delete=models.CASCADE, related_name='points')
+    x = models.CharField(max_length=100, null=True, blank=True)
+    y = models.FloatField(max_length=100, null=True, blank=True)
