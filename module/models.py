@@ -6,6 +6,7 @@ from django.conf import settings
 from .utils import *
 from .managers import UserManager
 import shutil
+import os
 
 # Create your models here.
 
@@ -129,12 +130,12 @@ class Docker(models.Model):
         return '%s/%s' % (settings.MEDIA_ROOT, self.img_name.lower())
 
     def create_folders(self):
-        os.makedirs(self.get_path(), 0o777)
+        os.makedirs('%s/experiments' % self.get_path(), 0o777)
 
     def create_docker(self, file, client):
         try:
             self.create_folders()
-            handle_uploaded_file(file, '%(media)s/%(img_name)s' % (settings.MEDIA_ROOT, self.img_name.lower()))
+            handle_uploaded_file(file, self.get_path())
             terminal_out(
                 "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(img_name)s --grpc_python_out=%(media)s/%(img_name)s %(img_name)s/%(proto)s" % { 
                     'media': settings.MEDIA_ROOT, 
@@ -152,23 +153,24 @@ class Docker(models.Model):
                 command='python server.py', 
                 detach=True, 
                 name=self.img_name, 
-                ports={50051: self.port}, 
+                ports={50051: 50051}, 
                 remove=True, 
                 volumes={
-                    '%s/%s/experiments' % (settings.MEDIA_ROOT, self.img_name): {
+                    '%s/experiments' % self.get_path(): {
                         'bind': '/media', 'mode': 'rw'
                     }
                 }
             )
-        except expression as identifier:
+            self.ip = '%s:50051' % self.container.attrs['NetworkSettings']['IPAddress']
+            print(self.container.attrs['NetworkSettings']['IPAddress'])
+        except:
             self.delete_model()
             return False
+        self.save()
         return True
 
     def delete_model(self, delete_img=False):
-        shutil.rmtree('%s/%s' (
-            settings.MEDIA_ROOT, self.img_name.lower()
-        ))
+        shutil.rmtree(self.get_path())
         shutil.rmtree('%s/%s' % (
             settings.ENV_ROOT, self.img_name.lower()
         ))

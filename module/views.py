@@ -93,46 +93,17 @@ def create_docker(request):
         if form.is_valid():
             data = form.cleaned_data
 
-            # docker = Docker(
-            #     name = data['name'],
-            #     ip = created_port(docker_.id),
-            #     languaje = data['languaje'],
-            #     proto_path = data['proto_path'].name,
-            #     base_path = '%s%s' % (settings.MEDIA_URL, paths['img_name']),
-            #     img_name = paths['img_name'],
-            #     user_id = request.user
-            # )
+            docker = Docker(
+                name = data['name'],
+                languaje = data['languaje'],
+                proto_path = data['proto_path'].name,
+                base_path = '%s%s' % (settings.MEDIA_URL, data['img_name']),
+                img_name = data['img_name'],
+                user_id = request.user
+            )
+            docker.save()
 
-            paths = {'media': settings.MEDIA_ROOT, 'img_name': request.POST.get(
-                'img_name').lower(), 'proto': data['proto_path'].name}
-
-            docker_ = form.save()
-            docker_.img_name = paths['img_name']
-            docker_.user = request.user
-            docker_.base_path = '%s%s' % (
-                settings.MEDIA_URL, paths['img_name'])
-            docker_.save()
-            port = created_port(docker_.id)
-            paths.update({'ip': port})
-            docker_.ip = port
-            print(images)
-            try:
-                os.makedirs('%(media)s/%(img_name)s/experiments' %
-                            paths, 0o777)
-                handle_uploaded_file(
-                    data['proto_path'], '%(media)s/%(img_name)s' % paths)
-                terminal_out(
-                    "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(img_name)s --grpc_python_out=%(media)s/%(img_name)s %(img_name)s/%(proto)s" % paths)
-                shutil.move('%(media)s/%(img_name)s/%(img_name)s' % paths,
-                            '/home/juanmarcon/Documentos/Project/django/lib/python3.6/site-packages/')
-                client.containers.run(image=paths['img_name'], command='python server.py', detach=True, name=docker_.img_name, ports={50051: paths['ip']}, remove=True, volumes={'%(media)s/%(img_name)s/experiments' % paths: {'bind': '/media', 'mode': 'rw'}})
-
-                # terminal_out("sudo docker run -d --rm --name %(img_name)s -p %(ip)s:50051 -v %(media)s/%(img_name)s/experiments:/media %(img_name)s:latest python server.py" % paths)
-            except Exception as e:
-                messages.error(request, e)
-                return render(request, 'docker/create.html', {'kind': GraphType.kind_choices, 'images': images})
-            docker_.proto_path = data['proto_path'].name
-            docker_.save()
+            docker.create_docker(data['proto_path'], client)
 
             elements_ = request.POST.getlist('type')
 
@@ -140,12 +111,12 @@ def create_docker(request):
                 if value != 'none':
                     ElementType.objects.create(
                         kind=value,
-                        docker=docker_,
+                        docker=docker,
                         element=Element.objects.get(id=item+1),
                     )
             if 'graph' in elements_:
-                return redirect('graph', docker_id=docker_.id)
-            return redirect('run_process', docker_id=docker_.id)
+                return redirect('graph', docker_id=docker.id)
+            return redirect('run_process', docker_id=docker.id)
         return render(request, 'docker/create.html', {'errors': form.errors, 'kind': GraphType.kind_choices, 'images': images})
     return render(request, 'docker/create.html', {'kind': GraphType.kind_choices, 'images': images})
     # return render(request, 'docker/create_form.html', {'kind': GraphType.kind_choices, 'images': images})
