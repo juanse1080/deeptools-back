@@ -1,5 +1,37 @@
 from django import template
+
+from datetime import datetime
+from datetime import timedelta
 register = template.Library()
+
+@register.filter
+def date(date):
+    data = datetime.strptime(str(date).split('.')[0], '%Y-%m-%d %H:%M:%S')
+    now = datetime.now()
+    resta = now - data
+    print(now, data, resta)
+    hours = int(resta.seconds/3600)
+    minutes = int(resta.seconds/60)
+    print(hours, minutes)
+    if(resta.days == 0):
+        if(hours <= 0):
+            if(minutes <= 1):
+                return "A minute ago"
+            elif(minutes <= 30):
+                return "%s minutes ago" % minutes
+            return "A hour ago"
+        elif(hours <= 10):
+            return "%s hours ago" % hours
+        return "Today at %s:%s" % (data.hour, data.minute)
+    elif(resta.days <= 7):
+        return "%s days ago" % resta.days
+    return resta
+
+@register.filter
+def clean_date(date):
+    data = datetime.strptime(str(date).split('.')[0], '%Y-%m-%d %H:%M:%S')
+    return "%s/%s/%s" % (data.day, data.month, data.year)
+
 
 @register.filter
 def error(errors): #retorna el primer error del campo

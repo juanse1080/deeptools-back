@@ -21,6 +21,13 @@ from django.contrib.auth.hashers import make_password
 
 from google.protobuf.json_format import MessageToDict
 
+# Class view
+from django.views import View
+from django.views.generic.list import ListView
+from django.views.generic.edit import DeletionMixin
+
+# LoginRequired
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 def create_usr(request):
     for i in ['input', 'output', 'response', 'graph', 'examples']:
@@ -83,6 +90,70 @@ def graph(request, docker_id):
             json.dump(request.POST.get('jsonContent'), f)
         return JsonResponse({'success': True})
     return render(request, 'docker/graph.html', {'id':docker_id})
+
+class DockerList(LoginRequiredMixin, ListView):
+    model = Docker
+    template_name = 'docker/list.html'
+    
+class DockerCreate(LoginRequiredMixin, View):
+    client = docker_env.from_env()
+    images = [i.tags[0].split(':')[0] for i in client.images.list() if i.tags]
+
+    def get(self, request, *args, **kwargs):
+        return render(request, 'docker/create.html', {'kind': GraphType.kind_choices, 'images': self.images})
+
+    def post(self, request, *args, **kwargs):
+        form = DockerForm(request.POST, request.FILES)
+        if form.is_valid():
+            data = form.cleaned_data
+
+            docker = Docker(
+                name = data['name'],
+                languaje = data['languaje'],
+                proto_path = data['proto_path'].name,
+                base_path = '%s%s' % (settings.MEDIA_URL, data['img_name']),
+                img_name = data['img_name'],
+                user_id = request.user
+            )
+            docker.save()
+
+            docker.create_docker(data['proto_path'])
+
+            elements_ = request.POST.getlist('type')
+
+            for item, value in enumerate(elements_):
+                if value != 'none':
+                    ElementType.objects.create(
+                        kind=value,
+                        docker=docker,
+                        element=Element.objects.get(id=item+1),
+                    )
+            if 'graph' in elements_:
+                return redirect('graph', docker_id=docker.id)
+            return redirect('run_process', docker_id=docker.id)
+        return render(request, 'docker/create.html', {'errors': form.errors, 'kind': GraphType.kind_choices, 'images': self.images})
+
+class DockerDetail(LoginRequiredMixin, DeletionMixin, View):
+    def get(self, request, *args, **kwargs):
+        docker = Docker.objects.get(id=self.kwargs['docker_id'])
+        print(docker.get_container().attrs['NetworkSettings']['IPAddress'])
+        return render(request, 'docker/create.html', {'object': docker})
+
+    def delete(self, request, *args, **kwargs):
+        docker = Docker.objects.get(id=self.kwargs['docker_id'])
+        docker.delete_model()
+        return JsonResponse({'success': True, 'object': {
+            "id": docker.id,
+            "name": docker.name,
+        }})
+    
+    def put(self, request, *args, **kwargs):
+        docker = Docker.objects.get(id=self.kwargs['docker_id'])
+        docker.stop_model()
+        return JsonResponse({'success': True, 'object': {
+            "id": docker.id,
+            "name": docker.name,
+        }})
 
 @login_required
 def create_docker(request):

@@ -59,6 +59,8 @@
 
 <body id="page-top">
 
+  <div id="modal"></div>
+
   <!-- Page Wrapper -->
   <div id="wrapper">
 
@@ -87,7 +89,7 @@
           <div id="module_{{ docker.id }}" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
             <div class="bg-white py-2 collapse-inner rounded">
               <h6 class="collapse-header">Options:</h6>
-              <a class="collapse-item" href="{% url 'run_process' docker_id=docker.id %}">Try</a>
+              <a class="collapse-item" href="{% url 'detail_docker' docker_id=docker.id %}">Try</a>
               {% if docker.have_experiments %}
                 <a class="collapse-item" href="{% url 'show_experiments' docker_id=docker.id experiment_id=docker.get_last_experiment.id %}">Experiments</a>
               {% endif %}

@@ -8,6 +8,8 @@ from .managers import UserManager
 import shutil
 import os
 
+import docker as docker_env
+
 # Create your models here.
 
 
@@ -105,14 +107,19 @@ class Docker(models.Model):
     lenguaje_choices = (
         ('python', 'Python'),
     )
+    state = models.BooleanField(default=True)
     name = models.CharField(max_length=100, unique=True)
-    ip = models.CharField(max_length=15, unique=True, null=True)
-    user = models.ForeignKey(
-        User, null=True, on_delete=models.CASCADE, related_name='owner')
+    ip = models.CharField(max_length=30, unique=True, null=True)
+    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE, related_name='owner')
     languaje = models.CharField(max_length=100, choices=lenguaje_choices)
     proto_path = models.CharField(max_length=500, null=True)
     base_path = models.CharField(max_length=500, null=True)
     img_name = models.CharField(max_length=500, null=True)
+    timestamp = models.DateTimeField(auto_now=True)
+
+    def get_container(self):
+        client = docker_env.from_env()
+        return client.containers.get(self.img_name)
 
     def get_proto_name(self):
         return self.proto_path.split('.')[0]
@@ -132,7 +139,7 @@ class Docker(models.Model):
     def create_folders(self):
         os.makedirs('%s/experiments' % self.get_path(), 0o777)
 
-    def create_docker(self, file, client):
+    def create_docker(self, file):
         try:
             self.create_folders()
             handle_uploaded_file(file, self.get_path())
@@ -148,33 +155,41 @@ class Docker(models.Model):
                 },
                 settings.ENV_ROOT
             )
-            self.container = client.containers.run(
-                image=self.img_name, 
-                command='python server.py', 
-                detach=True, 
-                name=self.img_name, 
-                ports={50051: 50051}, 
-                remove=True, 
-                volumes={
-                    '%s/experiments' % self.get_path(): {
-                        'bind': '/media', 'mode': 'rw'
-                    }
-                }
-            )
-            self.ip = '%s:50051' % self.container.attrs['NetworkSettings']['IPAddress']
-            print(self.container.attrs['NetworkSettings']['IPAddress'])
+            self.run_model()
+            container = self.get_container()
+            self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
         except:
             self.delete_model()
             return False
         self.save()
         return True
 
+    def run_model(self):
+        client = docker_env.from_env()
+        client.containers.run(
+            image=self.img_name, 
+            command='python server.py', 
+            detach=True, 
+            name=self.img_name, 
+            ports={50051: 50051}, 
+            remove=True, 
+            volumes={
+                '%s/experiments' % self.get_path(): {
+                    'bind': '/media', 'mode': 'rw'
+                }
+            }
+        )
+    
+    def stop_model(self):
+        self.state = not self.state
+        self.get_container().stop()
+
     def delete_model(self, delete_img=False):
         shutil.rmtree(self.get_path())
         shutil.rmtree('%s/%s' % (
             settings.ENV_ROOT, self.img_name.lower()
         ))
-        self.container.stop()
+        self.stop_model()
         self.delete()
             
         
@@ -218,6 +233,7 @@ class Experiment(models.Model):
     input_file = models.CharField(max_length=500, null=True)
     output_file = models.CharField(max_length=500, null=True)
     response = models.CharField(max_length=1000, null=True)
+    timestamp = models.DateTimeField(auto_now=True)
 
 
 class GraphType(models.Model):

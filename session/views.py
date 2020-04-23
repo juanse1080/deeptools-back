@@ -16,13 +16,13 @@ def template(request):
                if there is session  
     """
     if request.user.is_authenticated:
-        return redirect(views.create_docker)
+        return redirect('create_docker')
     else:
         if request.method == 'POST':
             user = auth(request)
             if user is not None:
                 login(request, user)
-                return redirect(views.create_docker)
+                return redirect('create_docker')
             messages.error(request, 'Credenciales incorrectas.')
         return render(request, 'login.html')
 

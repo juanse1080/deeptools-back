@@ -37,3 +37,159 @@ let randomNumber = () => {
     ];
     return colors[parseInt(Math.random() * (colors.length - 0) + 0)];
 }
+
+let delete_model = (self, parent, csrfmiddlewaretoken = $('meta[name=csrf]').attr("content")) => {
+    let alert = $('div.response')
+    $.ajax({
+        url: $(self).attr('url'),
+        data: {
+            csrfmiddlewaretoken,
+            _method:'delete',
+        },
+        method: 'POST',
+        dataType: 'json',
+        success: function (data) {
+            // console.log(data.comments);
+            if(data.success){
+                html = ''+
+                '<div class="alert alert-success alert-dismissible fade show" role="alert">'+
+                    '<strong>!You did it!</strong> You stop the container '+data.object.name+'.'+
+                    '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'+
+                        '<span aria-hidden="true">&times;</span>'+
+                    '</button>'+
+                '</div>'
+                alert.html('')
+                alert.html(html)
+                $('#'+parent).remove()
+            }
+        },
+
+        beforeSend: function(){
+            html = ''+
+            '<div class="alert alert-info alert-dismissible fade show" role="alert">'+
+                '<div class="row justify-content-between">'+
+                    '<div class="col-11">'+
+                        '<strong>!We are working on it!</strong> Your request is being processed'+
+                    '</div>'+
+                    '<div class="col-1 text-right">'+
+                        '<i class="fas fa-circle-notch fa-pulse"></i>'+
+                    '</div>'+
+                '</div>'+
+            '</div>'
+            alert.html(html)
+        }
+
+    });
+}
+
+let stop_model = (self, icon, csrfmiddlewaretoken = $('meta[name=csrf]').attr("content")) => {
+    let alert = $('div.response')
+    $.ajax({
+        url: $(self).attr('url'),
+        data: {
+            csrfmiddlewaretoken,
+            _method: 'put',
+        },
+        method: 'POST',
+        dataType: 'json',
+        success: function (data) {
+            // console.log(data.comments);
+            if(data.success){
+                html = ''+
+                '<div class="alert alert-success alert-dismissible fade show" role="alert">'+
+                    '<strong>!You did it!</strong> You stop the container '+data.object.name+'.'+
+                    '<button type="button" class="close" data-dismiss="alert" aria-label="Close">'+
+                        '<span aria-hidden="true">&times;</span>'+
+                    '</button>'+
+                '</div>'
+                alert.html('')
+                alert.html(html)
+                $('#'+icon).remove()
+                new_icon = ''+
+                '<i url="/module/'+data.object.state+'" 
+                    method="put" 
+                    onclick="click_model(
+                        this, 
+                        i'+data.object.state+Confirm request, 
+                        ¿You want to delete the container?
+                    )"
+                    class="fas fa-play-circle pointer text-primary" 
+                    data-toggle="tooltip" 
+                    data-placement="bottom" 
+                    title="Start model"
+                ></i>'
+            }
+        },
+
+        beforeSend: function(){
+            html = ''+
+            '<div class="alert alert-info alert-dismissible fade show" role="alert">'+
+                '<div class="row justify-content-between">'+
+                    '<div class="col-11">'+
+                        '<strong>!We are working on it!</strong> Your request is being processed'+
+                    '</div>'+
+                    '<div class="col-1 text-right">'+
+                        '<i class="fas fa-circle-notch fa-pulse"></i>'+
+                    '</div>'+
+                '</div>'+
+            '</div>'
+            alert.html(html)
+        }
+
+    });
+}
+
+let modalConstruct = (titulo, mensaje)  => {
+    modal = ''+
+    '<div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">'+
+        '<div class="modal-dialog modal-dialog-centered" role="document">'+
+            '<div class="modal-content">'+
+                '<div class="modal-header">'+
+                    '<h5 class="modal-title" id="exampleModalLongTitle">'+titulo+'</h5>'+
+                    '<button type="button" class="close" data-dismiss="modal" aria-label="Close">'+
+                        '<span aria-hidden="true">&times;</span>'+
+                    '</button>'+
+                '</div>'+
+                '<div class="modal-body">'+
+                    mensaje+
+                '</div>'+
+                '<div class="modal-footer">'+
+                    '<button type="button" class="btn btn-danger" id="modal-btn-si">Si</button>'+
+                    '<button type="button" class="btn btn-default" id="modal-btn-no">No</button>'+
+                '</div>'
+            '</div>'+
+        '</div>'+
+    '</div>';
+    return modal;
+}
+
+let newModal = (titulo, mensaje, insert_in=$('#modal')) => {
+    insert_in.html(modalConstruct(titulo, mensaje));
+    $('#exampleModalCenter').modal('show');
+}
+
+let modalConfirm = (titulo, mensaje, callback) => {
+    newModal(titulo, mensaje);
+    $("#modal-btn-si").on("click", function(){
+        callback(true);
+        $("#exampleModalCenter").modal('hide');
+    });
+    $("#modal-btn-no").on("click", function(){
+        callback(false);
+        $("#exampleModalCenter").modal('hide');
+        
+    });
+}
+
+let click_model = (self, parent, title, message) => {
+    modalConfirm(
+        title,
+        message, 
+        function(confirm){
+            $("#exampleModalCenter").modal('hide');
+            if(confirm){
+                actions_model(self, parent)
+            }
+        }
+    )
+}
