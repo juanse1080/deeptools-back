@@ -3,6 +3,7 @@ from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.utils.translation import ugettext_lazy as _
 from django.conf import settings
+from authenticate.models import User
 from .utils import *
 from .managers import UserManager
 import shutil
@@ -10,98 +11,11 @@ import os
 
 import docker as docker_env
 
-# Create your models here.
-
-
-class User(AbstractBaseUser, PermissionsMixin):
-
-    role_choices = (
-        ('admin', 'Administrador'),
-        ('creator', 'Creator'),
-        ('user', 'User'),
-    )
-    id_card = models.CharField(primary_key=True, max_length=15, unique=True)
-    dockers = models.ManyToManyField('Docker', related_name='users')
-    role = models.CharField(max_length=10, choices=role_choices)
-    birth = models.DateField(null=True)
-    first_name = models.CharField(max_length=35)
-    last_name = models.CharField(max_length=35)
-    email = models.CharField(max_length=60, unique=True)
-    timestamp = models.DateTimeField(auto_now=True)
-    is_staff = models.BooleanField(
-        _('staff status'),
-        default=False,
-        help_text=_(
-            'Designates whether the user can log into this admin site.'),
-    )
-    is_active = models.BooleanField(
-        _('active'),
-        default=True,
-        help_text=_(
-            'Designates whether this user should be treated as active. '
-            'Unselect this instead of deleting accounts.'
-        ),
-    )
-    objects = UserManager()
-
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
-
-    class Meta:
-        verbose_name = _('user')
-        verbose_name_plural = _('users')
-
-    def get_full_name(self):
-        """
-            This method get full name 
-            Returns:
-                {str}
-                    This is the full name
-        """
-        full_name = '%s %s' % (self.first_name, self.last_name)
-        return full_name.strip()
-
-    def get_short_name(self):
-        """
-            This method get short name
-            Returns:
-                {str}
-                    This is the fist name
-        """
-        return self.first_name
-
-    def get_template(self):
-        template = {
-            'admin': 'navbar/layout.html',
-            'creator': 'navbar/layout.html',
-            'user': 'navbar/user.html'
-        }
-        return template[self.role]
-
-    # def email_user(self, subject, message, from_email=None, **kwargs):
-    #     '''
-    #     Sends an email to this User.
-    #     '''
-    #     send_mail(subject, message, from_email, [self.email], **kwargs)
-
-    def __str__(self):
-        """
-            This method cast user to str
-            Returns:
-                {str}
-                    This is user identification
-        """
-        return self.id_card
-
-    def show(self):
-        """
-            This method cast user to dict
-            Returns:
-                {dict}
-                    This is user in dict format
-        """
-        return self.__dict__
-
+class Image:
+    def __init__(self, id, image):
+        self.id = id
+        self.name = image
+        self.label = image.split(':')[0]
 
 class Docker(models.Model):
     lenguaje_choices = (
@@ -110,7 +24,8 @@ class Docker(models.Model):
     state = models.BooleanField(default=True)
     name = models.CharField(max_length=100, unique=True)
     ip = models.CharField(max_length=30, unique=True, null=True)
-    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE, related_name='owner')
+    user = models.ForeignKey(
+        User, null=True, on_delete=models.CASCADE, related_name='owner')
     languaje = models.CharField(max_length=100, choices=lenguaje_choices)
     proto_path = models.CharField(max_length=500, null=True)
     base_path = models.CharField(max_length=500, null=True)
@@ -144,15 +59,15 @@ class Docker(models.Model):
             self.create_folders()
             handle_uploaded_file(file, self.get_path())
             terminal_out(
-                "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(img_name)s --grpc_python_out=%(media)s/%(img_name)s %(img_name)s/%(proto)s" % { 
-                    'media': settings.MEDIA_ROOT, 
-                    'img_name': self.img_name.lower(), 
+                "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(img_name)s --grpc_python_out=%(media)s/%(img_name)s %(img_name)s/%(proto)s" % {
+                    'media': settings.MEDIA_ROOT,
+                    'img_name': self.img_name.lower(),
                     'proto':  self.proto_path
                 }
             )
             shutil.move('%(media)s/%(img_name)s/%(img_name)s' % {
-                    'media': settings.MEDIA_ROOT, 'img_name': self.img_name.lower()
-                },
+                'media': settings.MEDIA_ROOT, 'img_name': self.img_name.lower()
+            },
                 settings.ENV_ROOT
             )
             self.run_model()
@@ -167,19 +82,19 @@ class Docker(models.Model):
     def run_model(self):
         client = docker_env.from_env()
         client.containers.run(
-            image=self.img_name, 
-            command='python server.py', 
-            detach=True, 
-            name=self.img_name, 
-            ports={50051: 50051}, 
-            remove=True, 
+            image=self.img_name,
+            command='python server.py',
+            detach=True,
+            name=self.img_name,
+            ports={50051: 50051},
+            remove=True,
             volumes={
                 '%s/experiments' % self.get_path(): {
                     'bind': '/media', 'mode': 'rw'
                 }
             }
         )
-    
+
     def stop_model(self):
         self.state = not self.state
         self.get_container().stop()
@@ -191,9 +106,6 @@ class Docker(models.Model):
         ))
         self.stop_model()
         self.delete()
-            
-        
-
 
 
     # def create_folder(self):

@@ -26,10 +26,10 @@
                                     </div>
                                     <div class="col-6 text-right">
                                         {% if docker.state %}
-                                            <i url="{% url 'detail_docker' docker_id=docker.id%}" method="get" onclick="click_model(this, 'i{{docker.id}}', 'Confirm request', '¿You want to delete the container?',)" class="fas fa-stop-circle pointer text-dark" data-toggle="tooltip" data-placement="bottom" title="Stop model"></i>
+                                            <i url="{% url 'detail_docker' docker_id=docker.id%}" method="put" onclick="click_model(this, 'i{{docker.id}}', 'Confirm request', '¿You want to stop the container?',)" class="fas fa-stop-circle pointer text-dark" data-toggle="tooltip" data-placement="bottom" title="Stop model"></i>
                                             <i class="fas fa-vial pointer text-success" data-toggle="tooltip" data-placement="bottom" title="Test model" url="{% url 'detail_docker' docker_id=docker.id%}" method="put" onclick="click_model(this, 'i{{docker.id}}', 'Confirm request', '¿You want to delete the container?',)"></i>
                                         {% else %}
-                                            <i url="{% url 'detail_docker' docker_id=docker.id%}" method="put" onclick="click_model(this, 'i{{docker.id}}', 'Confirm request', '¿You want to delete the container?',)"  class="fas fa-play-circle pointer text-primary" data-toggle="tooltip" data-placement="bottom" title="Start model"></i>
+                                            <i url="{% url 'detail_docker' docker_id=docker.id%}" method="get" onclick="click_model(this, 'i{{docker.id}}', 'Confirm request', '¿You want to delete the container?',)"  class="fas fa-play-circle pointer text-primary" data-toggle="tooltip" data-placement="bottom" title="Start model"></i>
                                         {% endif %}
                                         <i url="{% url 'detail_docker' docker_id=docker.id%}" method="delete" class="fas fa-trash text-danger pointer" data-toggle="tooltip" data-placement="bottom" title="Delete model" onclick="click_model(this, 'i{{docker.id}}', 'Confirm request', '¿You want to delete the container?',)"></i>
                                     </div>

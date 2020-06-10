@@ -64,3 +64,5 @@ def get_user(email):
         return models.User.objects.get(email=email)
     except models.User.DoesNotExist:
         return None
+
+
