@@ -18,26 +18,27 @@ class Image:
         self.label = image.split(':')[0]
 
 class Docker(models.Model):
+    id = models.CharField(max_length=32, primary_key=True)
     lenguaje_choices = (
         ('python', 'Python'),
     )
     state = models.BooleanField(default=True)
     name = models.CharField(max_length=100, unique=True)
     ip = models.CharField(max_length=30, unique=True, null=True)
-    user = models.ForeignKey(
-        User, null=True, on_delete=models.CASCADE, related_name='owner')
-    languaje = models.CharField(max_length=100, choices=lenguaje_choices)
-    proto_path = models.CharField(max_length=500, null=True)
+    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE, related_name='owner')
+    language = models.CharField(max_length=100, choices=lenguaje_choices)
+    proto = models.CharField(max_length=500, null=True)
     base_path = models.CharField(max_length=500, null=True)
-    img_name = models.CharField(max_length=500, null=True)
+    image = models.CharField(max_length=500, null=True)
+    graph = models.TextField()
     timestamp = models.DateTimeField(auto_now=True)
 
     def get_container(self):
         client = docker_env.from_env()
-        return client.containers.get(self.img_name)
+        return client.containers.get(self.id)
 
     def get_proto_name(self):
-        return self.proto_path.split('.')[0]
+        return self.proto.split('.')[0]
 
     def get_experiments(self):
         return self.experiments.order_by('id')
@@ -49,7 +50,7 @@ class Docker(models.Model):
         return len(self.experiments.all()) > 0
 
     def get_path(self):
-        return '%s/%s' % (settings.MEDIA_ROOT, self.img_name.lower())
+        return '%s/%s' % (settings.MEDIA_ROOT, self.id)
 
     def create_folders(self):
         os.makedirs('%s/experiments' % self.get_path(), 0o777)
@@ -57,16 +58,16 @@ class Docker(models.Model):
     def create_docker(self, file):
         try:
             self.create_folders()
-            handle_uploaded_file(file, self.get_path())
+            handle_uploaded_file(file, self.get_path(), 'protobuf_{0}'.format(self.id))
             terminal_out(
-                "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(img_name)s --grpc_python_out=%(media)s/%(img_name)s %(img_name)s/%(proto)s" % {
+                "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(image)s --grpc_python_out=%(media)s/%(image)s %(image)s/%(proto)s" % {
                     'media': settings.MEDIA_ROOT,
-                    'img_name': self.img_name.lower(),
-                    'proto':  self.proto_path
+                    'image': self.id,
+                    'proto':  self.proto
                 }
             )
-            shutil.move('%(media)s/%(img_name)s/%(img_name)s' % {
-                'media': settings.MEDIA_ROOT, 'img_name': self.img_name.lower()
+            shutil.move('%(media)s/%(image)s/%(image)s' % {
+                'media': settings.MEDIA_ROOT, 'image': self.id
             },
                 settings.ENV_ROOT
             )
@@ -82,10 +83,10 @@ class Docker(models.Model):
     def run_model(self):
         client = docker_env.from_env()
         client.containers.run(
-            image=self.img_name,
+            image=self.image,
             command='python server.py',
             detach=True,
-            name=self.img_name,
+            name=self.id,
             ports={50051: 50051},
             remove=True,
             volumes={
@@ -101,8 +102,8 @@ class Docker(models.Model):
 
     def delete_model(self, delete_img=False):
         shutil.rmtree(self.get_path())
-        shutil.rmtree('%s/%s' % (
-            settings.ENV_ROOT, self.img_name.lower()
+        shutil.rmtree('{0}{1}'.format(
+            settings.ENV_ROOT, self.id
         ))
         self.stop_model()
         self.delete()
@@ -110,12 +111,12 @@ class Docker(models.Model):
 
     # def create_folder(self):
     #     os.makedirs('%s/%s/experiments/user_%s/%s/input' % (settings.MEDIA_ROOT,
-    #                                                         self.img_name, request.user.id_card, experiment.id), 0o777)
+    #                                                         self.image, request.user.id_card, experiment.id), 0o777)
     #     os.makedirs('%s/%s/experiments/user_%s/%s/output' % (settings.MEDIA_ROOT,
-    #                                                             self.img_name, request.user.id_card, experiment.id), 0o777)
+    #                                                             self.image, request.user.id_card, experiment.id), 0o777)
 
     def create_folder_docker(self):
-        path = '%(media)s/%(img_name)s/experiments' % paths
+        path = '%(media)s/%(image)s/experiments' % paths
         os.makedirs(path, 0o777)
 
 

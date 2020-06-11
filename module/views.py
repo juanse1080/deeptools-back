@@ -112,7 +112,7 @@ class DockerCreate(LoginRequiredMixin, View):
                 languaje = data['languaje'],
                 proto_path = data['proto_path'].name,
                 base_path = '%s%s' % (settings.MEDIA_URL, data['img_name']),
-                img_name = data['img_name'],
+                image = data['img_name'],
                 user_id = request.user
             )
             docker.save()

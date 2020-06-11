@@ -7,6 +7,7 @@ from .api import *
 urlpatterns = [
     ############# Nuevas rutas ######################
     path('images/', listImages.as_view(), name="list_images"),
+    path('create/', createModule.as_view(), name="list_images"),
 
     ############# Rutas antiguas #######################
     url('graph/(?P<docker_id>[0-9]+)', views.graph, name="graph"),

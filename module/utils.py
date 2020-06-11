@@ -11,9 +11,11 @@ def select_view(list_):
         return 'docker/last.html'
     return 'docker/first.html'
 
-def handle_uploaded_file(file, location):
+def handle_uploaded_file(file, location, name):
+    ext = file.name.split('.')[-1]
+    alias = '{0}.{1}'.format(name, ext)
     fs = FileSystemStorage(location=location)
-    filename = fs.save(file.name, file)
+    filename = fs.save(alias, file)
     return fs.url(filename)
 
 def created_port(id, limit=65353, default='50051'):
