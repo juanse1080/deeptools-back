@@ -5,11 +5,15 @@ from django.utils.translation import ugettext_lazy as _
 from django.conf import settings
 from authenticate.models import User
 from .utils import *
+from .const import generate_protobuf
 from .managers import UserManager
 import shutil
 import os
 
+from django.utils.crypto import get_random_string
+
 import docker as docker_env
+
 
 class Image:
     def __init__(self, id, image):
@@ -17,57 +21,98 @@ class Image:
         self.name = image
         self.label = image.split(':')[0]
 
+
 class Docker(models.Model):
     id = models.CharField(max_length=32, primary_key=True)
     lenguaje_choices = (
         ('python', 'Python'),
     )
+    protocol = models.TextField()
     state = models.BooleanField(default=True)
     name = models.CharField(max_length=100, unique=True)
     ip = models.CharField(max_length=30, unique=True, null=True)
-    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE, related_name='owner')
-    language = models.CharField(max_length=100, choices=lenguaje_choices)
+    user = models.ForeignKey(
+        User, null=True, on_delete=models.CASCADE, related_name='owner')
+    language = models.CharField(
+        max_length=100, choices=lenguaje_choices, default='python')
     proto = models.CharField(max_length=500, null=True)
-    base_path = models.CharField(max_length=500, null=True)
+
+    path = models.CharField(max_length=500, null=True)
     image = models.CharField(max_length=500, null=True)
-    graph = models.TextField()
     timestamp = models.DateTimeField(auto_now=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.id = get_random_string(length=32)
+        self.proto = '{0}/protobuf_{0}.proto'.format(self.id)
 
     def get_container(self):
         client = docker_env.from_env()
         return client.containers.get(self.id)
 
-    def get_proto_name(self):
-        return self.proto.split('.')[0]
-
-    def get_experiments(self):
-        return self.experiments.order_by('id')
-
-    def get_last_experiment(self):
-        return self.experiments.order_by('-id')[0]
-
-    def have_experiments(self):
-        return len(self.experiments.all()) > 0
-
     def get_path(self):
-        return '%s/%s' % (settings.MEDIA_ROOT, self.id)
+        return '{0}/{1}'.format(settings.MEDIA_ROOT, self.id)
 
     def create_folders(self):
-        os.makedirs('%s/experiments' % self.get_path(), 0o777)
+        os.makedirs('{0}/experiments'.format(self.get_path()), 0o777)
 
-    def create_docker(self, file):
+    def dockerfile(self):
+        """  
+            proto:
+                {0}: ubicación absoluta del archivo (media_root)
+                {1}: archivo proto (proto)
+                {2}: ubicación del contenedor (path)
+            image: 
+                {0}: nombre de la imagen creada (image)
+            compile:
+                {0}: ubicación del contenedor (path)
+                {1}: carpeta contenedora de los archivos de comunicación (id)
+                {2}: ruta relativa del archivo proto (proto)
+        """
+        commands = {
+            'image': 'FROM {0}'.format(self.image),
+            'server': 'ADD server.py',
+            'proto': 'COPY {0}/{1} {2}'.format(settings.MEDIA_ROOT, self.proto, self.path),
+            'requirements': 'RUN pip install grpcio grpcio-tools',
+            'compile': 'python -m grpc_tools.protoc --proto_path={0} --python_out={0}/{1} --grpc_python_out={0}/{1} {2}'.format(self.path, self.id, self.proto)
+        }
+
+        dockerfile = '{0}/Dockerfile'.format(self.get_path())
+
+        with open(dockerfile, '+w') as file:
+            for command in commands.values():
+                file.write('{0}\n'.format(command))
+
+    def protobuf(self):
+        protobuf = '{0}/{1}'.format(settings.MEDIA_ROOT, self.proto)
+
+        with open(protobuf, '+w') as file_:
+            text_ = generate_protobuf([str(element)
+                                       for element in self.elements_type.all()])
+            file_.write(text_)
+
+    def create_docker(self):
         try:
+            # Creando el WORKDIR
             self.create_folders()
-            handle_uploaded_file(file, self.get_path(), 'protobuf_{0}'.format(self.id))
+
+            # alias = handle_uploaded_file(
+            #     file, self.get_path(), 'protobuf_{0}'.format(self.id))
+
+            # Generando los archivos de comunicación
+            self.protobuf()
+            self.dockerfile()
+
+            # Compilando el archivo de comunicación
             terminal_out(
-                "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(image)s --grpc_python_out=%(media)s/%(image)s %(image)s/%(proto)s" % {
+                "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(id)s --grpc_python_out=%(media)s/%(id)s %(id)s/%(proto)s" % {
                     'media': settings.MEDIA_ROOT,
-                    'image': self.id,
-                    'proto':  self.proto
-                }
-            )
-            shutil.move('%(media)s/%(image)s/%(image)s' % {
-                'media': settings.MEDIA_ROOT, 'image': self.id
+                    'id': self.id,
+                    'proto':  'protobuf_{0}.proto'.format(self.id)
+                })
+
+            shutil.move('%(media)s/%(id)s/%(id)s' % {
+                'media': settings.MEDIA_ROOT, 'id': self.id
             },
                 settings.ENV_ROOT
             )
@@ -75,7 +120,7 @@ class Docker(models.Model):
             container = self.get_container()
             self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
         except:
-            self.delete_model()
+            # self.delete_model()
             return False
         self.save()
         return True
@@ -109,29 +154,17 @@ class Docker(models.Model):
         self.delete()
 
 
-    # def create_folder(self):
-    #     os.makedirs('%s/%s/experiments/user_%s/%s/input' % (settings.MEDIA_ROOT,
-    #                                                         self.image, request.user.id_card, experiment.id), 0o777)
-    #     os.makedirs('%s/%s/experiments/user_%s/%s/output' % (settings.MEDIA_ROOT,
-    #                                                             self.image, request.user.id_card, experiment.id), 0o777)
-
-    def create_folder_docker(self):
-        path = '%(media)s/%(image)s/experiments' % paths
-        os.makedirs(path, 0o777)
-
-
 class ElementType(models.Model):
-    kind_choices = (
-        ('img', 'Image'),
-        ('txt', 'Text'),
-        ('video', 'Video'),
-        ('graph', 'Graph'),
-    )
-    kind = models.CharField(max_length=30, choices=kind_choices)
+    kind = models.CharField(max_length=30)
     docker = models.ForeignKey(Docker, null=False, blank=False,
                                on_delete=models.CASCADE, related_name='elements_type')
     element = models.ForeignKey(
         'Element', null=False, blank=False, on_delete=models.CASCADE, related_name='types')
+    len = models.CharField(max_length=1, default=0)
+    value = models.TextField()
+
+    def __str__(self):
+        return self.kind
 
 
 class Element(models.Model):
