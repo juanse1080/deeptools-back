@@ -13,6 +13,7 @@ class CreateElementsType(serializers.Serializer):
     kind = serializers.CharField(max_length=30)
     len = serializers.IntegerField()
     state = serializers.BooleanField(required=False)
+    value = serializers.CharField()
 
 
 class CreateModule(serializers.Serializer):
@@ -25,19 +26,18 @@ class ModuleSerializer(serializers.ModelSerializer):
     elements = CreateElementsType(many=True)
 
     def create(self, validated_data):
-        temp = validated_data
+        temp = validated_data.copy()
         del temp["elements"]
         with transaction.atomic():
             docker = Docker.objects.create(**temp)
-            for type_ in validated_data["elements"]:
-                for element in validated_data["elements"][type_]:
-                    ElementType.objects.create(
-                        kind=type_,
-                        docker=docker,
-                        element=Element.objects.get(name=key),
-                        value=element.value,
-                        len=element.len
-                    )
+            for element in validated_data["elements"]:
+                ElementType.objects.create(
+                    kind=element['kind'],
+                    docker=docker,
+                    element=Element.objects.get(name=element['kind']),
+                    value=element['value'],
+                    len=element['len']
+                )
         return docker
 
     class Meta:

@@ -5,7 +5,8 @@ from django.utils.translation import ugettext_lazy as _
 from django.conf import settings
 from authenticate.models import User
 from .utils import *
-from .const import generate_protobuf
+from .generate.proto import ProtoFile
+from .generate.server import ServerFile
 from .managers import UserManager
 import shutil
 import os
@@ -23,23 +24,27 @@ class Image:
 
 
 class Docker(models.Model):
-    id = models.CharField(max_length=32, primary_key=True)
     lenguaje_choices = (
         ('python', 'Python'),
     )
-    protocol = models.TextField()
+
+    id = models.CharField(max_length=32, primary_key=True)
     state = models.BooleanField(default=True)
-    name = models.CharField(max_length=100, unique=True)
     ip = models.CharField(max_length=30, unique=True, null=True)
+    proto = models.CharField(max_length=500, null=True)
+    timestamp = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(
         User, null=True, on_delete=models.CASCADE, related_name='owner')
     language = models.CharField(
         max_length=100, choices=lenguaje_choices, default='python')
-    proto = models.CharField(max_length=500, null=True)
 
-    path = models.CharField(max_length=500, null=True)
-    image = models.CharField(max_length=500, null=True)
-    timestamp = models.DateTimeField(auto_now=True)
+    protocol = models.TextField()
+
+    name = models.CharField(max_length=100, unique=True)
+    image = models.CharField(max_length=100, null=True)
+    workdir = models.CharField(max_length=500, null=True)
+    file = models.CharField(max_length=100, null=True)
+    classname = models.CharField(max_length=100, null=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -72,9 +77,9 @@ class Docker(models.Model):
         commands = {
             'image': 'FROM {0}'.format(self.image),
             'server': 'ADD server.py',
-            'proto': 'COPY {0}/{1} {2}'.format(settings.MEDIA_ROOT, self.proto, self.path),
+            'proto': 'COPY {0}/{1} {2}'.format(settings.MEDIA_ROOT, self.proto, self.workdir),
             'requirements': 'RUN pip install grpcio grpcio-tools',
-            'compile': 'python -m grpc_tools.protoc --proto_path={0} --python_out={0}/{1} --grpc_python_out={0}/{1} {2}'.format(self.path, self.id, self.proto)
+            'compile': 'python -m grpc_tools.protoc --proto_path={0} --python_out={0}/{1} --grpc_python_out={0}/{1} {2}'.format(self.workdir, self.id, self.proto)
         }
 
         dockerfile = '{0}/Dockerfile'.format(self.get_path())
@@ -87,21 +92,34 @@ class Docker(models.Model):
         protobuf = '{0}/{1}'.format(settings.MEDIA_ROOT, self.proto)
 
         with open(protobuf, '+w') as file_:
-            text_ = generate_protobuf([str(element)
-                                       for element in self.elements_type.all()])
-            file_.write(text_)
+            proto = ProtoFile(items=[{
+                'kind': element.kind,
+                'len': element.len
+            } for element in self.elements_type.all()])
+
+            file_.write(proto.create_protobuf())
+
+    def server(self):
+        server = '{0}/{1}/server.py'.format(settings.MEDIA_ROOT, self.id)
+
+        with open(server, '+w') as file_:
+            aux = ServerFile(items=[{
+                'kind': element.kind,
+                'len': element.len
+            } for element in self.elements_type.all()])
+
+            file_.write(aux.create_server(self.id, self.file, self.classname))
 
     def create_docker(self):
+
         try:
             # Creando el WORKDIR
             self.create_folders()
 
-            # alias = handle_uploaded_file(
-            #     file, self.get_path(), 'protobuf_{0}'.format(self.id))
-
             # Generando los archivos de comunicación
             self.protobuf()
             self.dockerfile()
+            self.server()
 
             # Compilando el archivo de comunicación
             terminal_out(
