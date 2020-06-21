@@ -10,6 +10,7 @@ from .generate.server import ServerFile
 from .managers import UserManager
 import shutil
 import os
+import sys
 
 from django.utils.crypto import get_random_string
 
@@ -48,8 +49,8 @@ class Docker(models.Model):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.id = get_random_string(length=32)
-        self.proto = '{0}/protobuf_{0}.proto'.format(self.id)
+        self.id = '__{}'.format(get_random_string(length=30))
+        self.proto = '{0}/protobuf.proto'.format(self.id)
 
     def get_container(self):
         client = docker_env.from_env()
@@ -76,10 +77,10 @@ class Docker(models.Model):
         """
         commands = {
             'image': 'FROM {0}'.format(self.image),
-            'server': 'ADD server.py',
+            'server': 'COPY {0}/{1}/server.py {2}'.format(settings.MEDIA_ROOT, self.id, self.workdir),
             'proto': 'COPY {0}/{1} {2}'.format(settings.MEDIA_ROOT, self.proto, self.workdir),
             'requirements': 'RUN pip install grpcio grpcio-tools',
-            'compile': 'python -m grpc_tools.protoc --proto_path={0} --python_out={0}/{1} --grpc_python_out={0}/{1} {2}'.format(self.workdir, self.id, self.proto)
+            'compile': 'RUN python -m grpc_tools.protoc --proto_path={0} --python_out={0}/{1} --grpc_python_out={0}/{1} protobuf.proto && touch {0}/{1}/__init__.py'.format(self.workdir, self.id)
         }
 
         dockerfile = '{0}/Dockerfile'.format(self.get_path())
@@ -126,7 +127,7 @@ class Docker(models.Model):
                 "python -m grpc_tools.protoc --proto_path=%(media)s --python_out=%(media)s/%(id)s --grpc_python_out=%(media)s/%(id)s %(id)s/%(proto)s" % {
                     'media': settings.MEDIA_ROOT,
                     'id': self.id,
-                    'proto':  'protobuf_{0}.proto'.format(self.id)
+                    'proto':  'protobuf.proto'.format(self.id)
                 })
 
             shutil.move('%(media)s/%(id)s/%(id)s' % {
@@ -134,14 +135,29 @@ class Docker(models.Model):
             },
                 settings.ENV_ROOT
             )
+            print("####### entro")
+            self.build_image()
+            print("####### salio")
+
             self.run_model()
             container = self.get_container()
             self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
         except:
+            exc_type, exc_obj, tb = sys.exc_info()
+            print(exc_type)
+            print(exc_obj)
+            traceback.print_exc()
             # self.delete_model()
             return False
         self.save()
         return True
+
+    def build_image(self):
+        try:
+            client = docker_env.from_env()
+            client.images.build(path=self.get_path(), tag=self.id)
+        except:
+            print("####### ERROR ", identifier)
 
     def run_model(self):
         client = docker_env.from_env()

@@ -58,7 +58,6 @@ class ServerFile(File):
 
     def build_in(self):
         self.content += 'def inputs_data(inputs):\n\treturn [input.value for input in inputs]\n\n'
-        print("########", self._have_outputs)
         if self._have_outputs:
             self.content += 'def outputs_data(outputs):\n\treturn [output.value for output in outputs]\n\n'
         self.content += 'def in_data(data):\n\treturn (\n\t\tinputs_data(data.inputs.inputs),\n'
@@ -67,7 +66,7 @@ class ServerFile(File):
         self.content += '\t)\n\n'
 
     def create_server(self, id, file, class__):
-        self.content += 'import grpc\nfrom concurrent import futures\nimport threading\nimport time\nimport {0}_pb2 as objects\nimport {0}_pb2_grpc as services\nimport {1}\n_ONE_DAY_IN_SECONDS = 60 * 60 * 24\n\n'.format(
+        self.content += 'import grpc\nfrom concurrent import futures\nimport threading\nimport time\nfrom .{0} import protobuf_pb2 as objects\nfrom .{0} import protobuf_pb2_grpc as services\nimport {1}\n_ONE_DAY_IN_SECONDS = 60 * 60 * 24\n\n'.format(
             id, file)
 
         self.get_content()
