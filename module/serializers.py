@@ -16,13 +16,19 @@ class CreateElementsType(serializers.Serializer):
     value = serializers.CharField()
 
 
-class CreateModule(serializers.Serializer):
-    id = serializers.CharField(max_length=32, required=False)
-    elements = CreateElementsType(many=True)
+class CheckBuildSerializer(serializers.Serializer):
+    id = serializers.CharField(max_length=32)
 
 
-class ModuleSerializer(serializers.ModelSerializer):
+class RetrieveModuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Docker
+        fields = '__all__'
+
+
+class CreateModuleSerializer(serializers.ModelSerializer):
     id = serializers.CharField(max_length=32, required=False)
+    image_name = serializers.CharField(max_length=32, required=False)
     elements = CreateElementsType(many=True)
 
     def create(self, validated_data):

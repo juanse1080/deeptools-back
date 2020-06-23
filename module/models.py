@@ -10,11 +10,13 @@ from .generate.server import ServerFile
 from .managers import UserManager
 import shutil
 import os
+import json
+
+import traceback
 import sys
 
-from django.utils.crypto import get_random_string
-
 import docker as docker_env
+from channels.layers import get_channel_layer
 
 
 class Image:
@@ -30,6 +32,8 @@ class Docker(models.Model):
     )
 
     id = models.CharField(max_length=32, primary_key=True)
+    image_name = models.CharField(max_length=32, unique=True)
+
     state = models.BooleanField(default=True)
     ip = models.CharField(max_length=30, unique=True, null=True)
     proto = models.CharField(max_length=500, null=True)
@@ -40,6 +44,7 @@ class Docker(models.Model):
         max_length=100, choices=lenguaje_choices, default='python')
 
     protocol = models.TextField()
+    build = models.BooleanField(default=False)
 
     name = models.CharField(max_length=100, unique=True)
     image = models.CharField(max_length=100, null=True)
@@ -47,14 +52,9 @@ class Docker(models.Model):
     file = models.CharField(max_length=100, null=True)
     classname = models.CharField(max_length=100, null=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.id = '__{}'.format(get_random_string(length=30))
-        self.proto = '{0}/protobuf.proto'.format(self.id)
-
     def get_container(self):
         client = docker_env.from_env()
-        return client.containers.get(self.id)
+        return client.containers.get(self.image_name)
 
     def get_path(self):
         return '{0}/{1}'.format(settings.MEDIA_ROOT, self.id)
@@ -63,12 +63,12 @@ class Docker(models.Model):
         os.makedirs('{0}/experiments'.format(self.get_path()), 0o777)
 
     def dockerfile(self):
-        """  
+        """
             proto:
                 {0}: ubicación absoluta del archivo (media_root)
                 {1}: archivo proto (proto)
                 {2}: ubicación del contenedor (path)
-            image: 
+            image:
                 {0}: nombre de la imagen creada (image)
             compile:
                 {0}: ubicación del contenedor (path)
@@ -77,10 +77,13 @@ class Docker(models.Model):
         """
         commands = {
             'image': 'FROM {0}'.format(self.image),
-            'server': 'COPY {0}/{1}/server.py {2}'.format(settings.MEDIA_ROOT, self.id, self.workdir),
-            'proto': 'COPY {0}/{1} {2}'.format(settings.MEDIA_ROOT, self.proto, self.workdir),
+            'server': 'COPY ./server.py {0}'.format(self.workdir),
+            'proto': 'COPY ./protobuf.proto {0}'.format(self.workdir),
+
+            'mkdir': 'RUN mkdir {0}/{1}'.format(self.workdir, self.id),
             'requirements': 'RUN pip install grpcio grpcio-tools',
-            'compile': 'RUN python -m grpc_tools.protoc --proto_path={0} --python_out={0}/{1} --grpc_python_out={0}/{1} protobuf.proto && touch {0}/{1}/__init__.py'.format(self.workdir, self.id)
+            'compile': 'RUN python -m grpc_tools.protoc --proto_path={0} --python_out={0}/{1} --grpc_python_out={0}/{1} protobuf.proto'.format(self.workdir, self.id),
+            'init': 'RUN touch {0}/{1}/__init__.py'.format(self.workdir, self.id)
         }
 
         dockerfile = '{0}/Dockerfile'.format(self.get_path())
@@ -135,13 +138,10 @@ class Docker(models.Model):
             },
                 settings.ENV_ROOT
             )
-            print("####### entro")
-            self.build_image()
-            print("####### salio")
 
-            self.run_model()
-            container = self.get_container()
-            self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
+            # self.run_model()
+            # container = self.get_container()
+            # self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
         except:
             exc_type, exc_obj, tb = sys.exc_info()
             print(exc_type)
@@ -153,11 +153,31 @@ class Docker(models.Model):
         return True
 
     def build_image(self):
-        try:
-            client = docker_env.from_env()
-            client.images.build(path=self.get_path(), tag=self.id)
-        except:
-            print("####### ERROR ", identifier)
+        self.build = True
+        self.save()
+        messages = []
+        client = docker_env.APIClient(base_url='unix://var/run/docker.sock')
+        generator = client.build(path=self.get_path(), rm=True,
+                                 tag='{0}:latest'.format(self.image_name))
+        channel_layer = get_channel_layer()
+        print("#############333 ", self.image_name)
+        for i in generator:
+            aux = json.loads(i.decode('utf-8'))
+            if "stream" in aux:
+                split_ = aux["stream"].split(':')
+                numbers = split_[0].split("Step ")
+                if len(split_) > 1 and len(numbers) > 1:
+                    data = numbers[1].split('/')
+                    content = {
+                        'state': 100*int(data[0])/float(data[1]),
+                        'description': aux["stream"]
+                    }
+                    messages.append(content)
+                    channel_layer.group_send(
+                        self.image_name,
+                        {'type': 'progress_group', 'progress': messages}
+                    )
+                    print(content)
 
     def run_model(self):
         client = docker_env.from_env()

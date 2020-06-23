@@ -43,7 +43,8 @@ INSTALLED_APPS = [
     'module',
     'session',
     'media',
-    'authenticate'
+    'authenticate',
+    'channels'
 ]
 
 MIDDLEWARE = [
@@ -103,16 +104,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'admin.wsgi.application'
 
+# Definiciones de capa de canal
+# http://channels.readthedocs.org/en/latest/deploying.html#setting-up-a-channel-backend
 
-# Database
-# https://docs.djangoproject.com/en/2.2/ref/settings/#databases
+ASGI_APPLICATION = "module.routing.application"
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-#     }
-# }
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [('127.0.0.1', 6379)]
+        }
+    },
+}
 
 DATABASES = {
     'default': {
