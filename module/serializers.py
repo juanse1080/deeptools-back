@@ -20,7 +20,15 @@ class CheckBuildSerializer(serializers.Serializer):
     id = serializers.CharField(max_length=32)
 
 
+class ElementTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ElementType
+        fields = '__all__'
+
+
 class RetrieveModuleSerializer(serializers.ModelSerializer):
+    elements_type = ElementTypeSerializer(many=True)
+
     class Meta:
         model = Docker
         fields = '__all__'

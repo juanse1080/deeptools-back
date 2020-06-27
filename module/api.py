@@ -27,7 +27,17 @@ class listImages(generics.ListAPIView):
 
     def get_queryset(self):
         client = docker_env.from_env()
-        return [Image(image.id, tag) for image in client.images.list() for tag in image.tags]
+        # images = []
+        # for image in client.images.list():
+        #     for tag in image.tags:
+        #         print(tag.split(':')[0])
+        #         images.append(Image(image.id, tag))
+        #         if Docker.objects.filter(image_name=tag.split(':')[0]).count() == 0:
+        #             print("ENTRO", tag.split(':')[0])
+
+        # return images
+
+        return [Image(image.id, tag) for image in client.images.list() for tag in image.tags if Docker.objects.filter(image_name=tag.split(':')[0]).count() == 0]
 
 
 class createModule(generics.CreateAPIView):
