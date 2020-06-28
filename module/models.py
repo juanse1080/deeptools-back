@@ -147,54 +147,58 @@ class Docker(models.Model):
             print(exc_type)
             print(exc_obj)
             traceback.print_exc()
-            # self.delete_model()
-            return False
+            self.delete_model()
         self.save()
         return True
 
     def build_docker(self):
-        self.build = True
-        self.save()
-        client = docker_env.APIClient(base_url='unix://var/run/docker.sock')
-        steps = [
-            [
-                "Step 1/7:",
-                "Loading image {0} ...".format(self.image),
-                "Loaded image {0}".format(self.image)
-            ], [
-                "Step 2/7:",
-                "Creating service files ...",
-                "Created service files"
-            ], [
-                "Step 3/7:",
-                "Creating comunication files ...",
-                "Created comunication files"
-            ], [
-                "Step 4/7:",
-                "Moving comunication and service files to workdir('{0}') ...".format(
-                    self.workdir),
-                "Moved comunication and service files to workdir('{0}')".format(
-                    self.workdir)
-            ], [
-                "Step 5/7:",
-                "Instaling dependencies of comunication ...",
-                "Instaled dependencies of comunication"
-            ], [
-                "Step 6/7:",
-                "Compiling comunication files ...",
-                "Compiled comunication files"
-            ], [
-                "Step 7/7:",
-                "Cleaning records ...",
-                "Cleaned records"
+        try:
+            self.build = True
+            self.save()
+            client = docker_env.APIClient(
+                base_url='unix://var/run/docker.sock')
+            steps = [
+                [
+                    "Step 1/7:",
+                    "Loading image {0} ...".format(self.image),
+                    "Loaded image {0}".format(self.image)
+                ], [
+                    "Step 2/7:",
+                    "Creating service files ...",
+                    "Created service files"
+                ], [
+                    "Step 3/7:",
+                    "Creating comunication files ...",
+                    "Created comunication files"
+                ], [
+                    "Step 4/7:",
+                    "Moving comunication and service files to workdir('{0}') ...".format(
+                        self.workdir),
+                    "Moved comunication and service files to workdir('{0}')".format(
+                        self.workdir)
+                ], [
+                    "Step 5/7:",
+                    "Instaling dependencies of comunication ...",
+                    "Instaled dependencies of comunication"
+                ], [
+                    "Step 6/7:",
+                    "Compiling comunication files ...",
+                    "Compiled comunication files"
+                ], [
+                    "Step 7/7:",
+                    "Cleaning records ...",
+                    "Cleaned records"
+                ]
             ]
-        ]
 
-        return (
-            client.build(path=self.get_path(), rm=True,
-                         tag='{0}:latest'.format(self.image_name)),
-            steps
-        )
+            return (
+                client.build(path=self.get_path(), rm=True,
+                             tag='{0}:latest'.format(self.image_name)),
+                steps
+            )
+        except expression as identifier:
+            self.delete_model()
+            return [{'stream': "error"}, {'stream': "error"}], [["Error:", "An error occurred during model shrinkage. Check the data and try again"]]
 
     def build_image(self):
         self.build = True
@@ -225,20 +229,27 @@ class Docker(models.Model):
         return True
 
     def run_model(self):
-        client = docker_env.from_env()
-        client.containers.run(
-            image=self.image,
-            command='python server.py',
-            detach=True,
-            name=self.id,
-            ports={50051: 50051},
-            remove=True,
-            volumes={
-                '%s/experiments' % self.get_path(): {
-                    'bind': '/media', 'mode': 'rw'
+        try:
+            print("entro")
+            client = docker_env.from_env()
+            container = client.containers.run(
+                image=self.image_name,
+                command='python {}/server.py'.format(self.workdir),
+                detach=True,
+                name=self.image_name,
+                ports={50051: 50051},
+                remove=True,
+                volumes={
+                    '{}/experiments'.format(self.get_path()): {
+                        'bind': '{}/media'.format(self.workdir), 'mode': 'rw'
+                    }
                 }
-            }
-        )
+            )
+            print("salio")
+            return container
+        except docker.errors.ContainerError as error:
+            print(error)
+            return error
 
     def stop_model(self):
         self.state = not self.state
@@ -249,7 +260,6 @@ class Docker(models.Model):
         shutil.rmtree('{0}{1}'.format(
             settings.ENV_ROOT, self.id
         ))
-        self.stop_model()
         self.delete()
 
 

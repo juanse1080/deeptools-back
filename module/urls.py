@@ -9,6 +9,8 @@ urlpatterns = [
     path('images/', listImages.as_view(), name="list_images"),
     path('create/', createModule.as_view(), name="create_module"),
     path('build/<str:pk>', checkBuild.as_view(), name="check_build"),
+    path('stop/<str:pk>', stopContainer.as_view(), name="stop_container"),
+    path('', listModule.as_view(), name="list_modules"),
 
     ############# Rutas antiguas #######################
     url('graph/(?P<docker_id>[0-9]+)', views.graph, name="graph"),

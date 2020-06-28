@@ -15,20 +15,35 @@ class ChatConsumer(WebsocketConsumer):
     def build(self, data):
         item = []
         index = 0
+        progress = 0
         module = Docker.objects.get(image_name=self.room_name)
         generator, steps = module.build_docker()
         for description in generator:
+            print(type(description))
+            print(description)
             aux = json.loads(description.decode('utf-8'))
             if "stream" in aux:
+                if aux["stream"] == 'error':
+                    content = {
+                        'progress': progress,
+                        'description': steps[index][-1],
+                        'state': 'error'
+                    }
+                    print(content)
+                    item.append(content)
+                    self.progress_group(item)
+                    index += 1
+
                 split_ = aux["stream"].split(':')
                 numbers = split_[0].split("Step ")
                 if len(split_) > 1 and len(numbers) > 1:
                     data = numbers[1].split('/')
-                    state = 100*int(data[0])/float(data[1])
+                    progress = 100*int(data[0])/float(data[1])
                     if index > 0:
                         content = {
-                            'state': state,
-                            'description': steps[index - 1][-1]
+                            'progress': progress,
+                            'description': steps[index - 1][-1],
+                            'state': 'execute'
                         }
                         print(content)
                         item.append(content)
@@ -36,8 +51,9 @@ class ChatConsumer(WebsocketConsumer):
 
                     for step in steps[index][:-1]:
                         content = {
-                            'state': state,
-                            'description': step
+                            'progress': progress,
+                            'description': step,
+                            'state': 'execute'
                         }
                         print(content)
                         item.append(content)
@@ -45,16 +61,16 @@ class ChatConsumer(WebsocketConsumer):
 
                     index += 1
 
+        module.run_model()
         content = {
-            'state': state,
-            'description': steps[-1][-1]
+            'progress': progress,
+            'description': steps[-1][-1],
+            'state': 'success'
         }
         item.append(content)
         self.progress_group(item)
         module.build = False
         module.save()
-
-        index += 1
 
     commands = {
         'build': build,

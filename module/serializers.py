@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import *
+from authenticate.models import User
 from django.db import transaction
 
 
@@ -16,6 +17,12 @@ class CreateElementsType(serializers.Serializer):
     value = serializers.CharField()
 
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = '__all__'
+
+
 class CheckBuildSerializer(serializers.Serializer):
     id = serializers.CharField(max_length=32)
 
@@ -23,6 +30,14 @@ class CheckBuildSerializer(serializers.Serializer):
 class ElementTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ElementType
+        fields = '__all__'
+
+
+class ListModuleSerialize(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = Docker
         fields = '__all__'
 
 
