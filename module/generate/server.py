@@ -65,9 +65,9 @@ class ServerFile(File):
             self.content += '\t\toutputs_data(data.outputs.outputs),\n'
         self.content += '\t)\n\n'
 
-    def create_server(self, id, file, class__):
-        self.content += 'import grpc\nfrom concurrent import futures\nimport threading\nimport time\nfrom .{0} import protobuf_pb2 as objects\nfrom .{0} import protobuf_pb2_grpc as services\nimport {1}\n_ONE_DAY_IN_SECONDS = 60 * 60 * 24\n\n'.format(
-            id, file)
+    def create_server(self, id, file, workdir, class__):
+        self.content += 'import grpc\nfrom concurrent import futures\nimport threading\nimport time\nimport sys\nsys.path.insert(0, "{2}/{0}")\nfrom {0} import protobuf_pb2 as objects\nfrom {0} import protobuf_pb2_grpc as services\nimport {1}\n_ONE_DAY_IN_SECONDS = 60 * 60 * 24\n\n'.format(
+            id, file, workdir)
 
         self.get_content()
         self.build_in()

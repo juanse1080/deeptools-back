@@ -31,11 +31,19 @@ class Docker(models.Model):
         ('python', 'Python'),
     )
 
+    state_choices = (
+        ('stopped', 'Stopped'),
+        ('deleted', 'Deleted'),
+        ('building', 'Building'),
+        ('active', 'Active'),
+    )
+
     id = models.CharField(max_length=32, primary_key=True)
     image_name = models.CharField(max_length=32, unique=True)
 
-    state = models.BooleanField(default=True)
-    ip = models.CharField(max_length=30, unique=True, null=True)
+    state = models.CharField(
+        max_length=10, choices=state_choices, default='building')
+    ip = models.CharField(max_length=30, null=True)
     proto = models.CharField(max_length=500, null=True)
     timestamp = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(
@@ -44,7 +52,6 @@ class Docker(models.Model):
         max_length=100, choices=lenguaje_choices, default='python')
 
     protocol = models.TextField()
-    build = models.BooleanField(default=False)
 
     name = models.CharField(max_length=100, unique=True)
     image = models.CharField(max_length=100, null=True)
@@ -112,7 +119,8 @@ class Docker(models.Model):
                 'len': element.len
             } for element in self.elements_type.all()])
 
-            file_.write(aux.create_server(self.id, self.file, self.classname))
+            file_.write(aux.create_server(self.id, ''.join(self.file.split(
+                '.')[:-1]), self.workdir, self.classname))
 
     def create_docker(self):
 
@@ -147,14 +155,12 @@ class Docker(models.Model):
             print(exc_type)
             print(exc_obj)
             traceback.print_exc()
-            self.delete_model()
+            self.__delete_model()
         self.save()
         return True
 
     def build_docker(self):
         try:
-            self.build = True
-            self.save()
             client = docker_env.APIClient(
                 base_url='unix://var/run/docker.sock')
             steps = [
@@ -197,65 +203,53 @@ class Docker(models.Model):
                 steps
             )
         except expression as identifier:
-            self.delete_model()
+            self.__delete_model()
             return [{'stream': "error"}, {'stream': "error"}], [["Error:", "An error occurred during model shrinkage. Check the data and try again"]]
-
-    def build_image(self):
-        self.build = True
-        self.save()
-        messages = []
-        client = docker_env.APIClient(base_url='unix://var/run/docker.sock')
-        generator = client.build(path=self.get_path(), rm=True,
-                                 tag='{0}:latest'.format(self.image_name))
-        channel_layer = get_channel_layer()
-        print("#############333 ", self.image_name)
-        for i in generator:
-            aux = json.loads(i.decode('utf-8'))
-            if "stream" in aux:
-                split_ = aux["stream"].split(':')
-                numbers = split_[0].split("Step ")
-                if len(split_) > 1 and len(numbers) > 1:
-                    data = numbers[1].split('/')
-                    content = {
-                        'state': 100*int(data[0])/float(data[1]),
-                        'description': aux["stream"]
-                    }
-                    messages.append(content)
-                    channel_layer.group_send(
-                        self.image_name,
-                        {'type': 'progress.group', 'progress': messages}
-                    )
-                    print(content)
-        return True
 
     def run_model(self):
         try:
-            print("entro")
             client = docker_env.from_env()
-            container = client.containers.run(
+            client.containers.run(
                 image=self.image_name,
-                command='python {}/server.py'.format(self.workdir),
+                command='python server.py',
                 detach=True,
                 name=self.image_name,
-                ports={50051: 50051},
+                # ports={50051: 50051},
                 remove=True,
+                working_dir=self.workdir,
                 volumes={
                     '{}/experiments'.format(self.get_path()): {
                         'bind': '{}/media'.format(self.workdir), 'mode': 'rw'
                     }
                 }
             )
-            print("salio")
-            return container
-        except docker.errors.ContainerError as error:
+            container = self.get_container()
+            self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
+            self.state = 'active'
+            self.save()
+        except docker_env.errors.ContainerError as error:
+            print(error)
+            return error
+        except docker_env.errors.APIError as error:
             print(error)
             return error
 
     def stop_model(self):
-        self.state = not self.state
         self.get_container().stop()
+        self.state = 'stopped'
+        self.ip = ''
+        self.save()
 
-    def delete_model(self, delete_img=False):
+    def delete_module(self):
+        if self.state == 'active':
+            self.get_container().stop()
+
+        client = docker_env.from_env()
+        client.images.remove(image=self.image_name, force=True)
+        self.state = 'deleted'
+        self.save()
+
+    def __delete_model(self, delete_img=False):
         shutil.rmtree(self.get_path())
         shutil.rmtree('{0}{1}'.format(
             settings.ENV_ROOT, self.id
@@ -281,36 +275,21 @@ class Element(models.Model):
 
 
 class Experiment(models.Model):
+    state = models.CharField(max_length=10, default='created')
     user = models.ForeignKey(User, null=True, blank=False,
                              on_delete=models.CASCADE, related_name='experiments')
     docker = models.ForeignKey(Docker, null=True, blank=False,
                                on_delete=models.CASCADE, related_name='experiments')
-    input_file = models.CharField(max_length=500, null=True)
-    output_file = models.CharField(max_length=500, null=True)
-    response = models.CharField(max_length=1000, null=True)
     timestamp = models.DateTimeField(auto_now=True)
 
-
-class GraphType(models.Model):
-    kind_choices = (
-        ('bar', 'Bar graphic'),
-        ('donut', 'Donut chart'),
-    )
-    name = models.CharField(max_length=30, choices=kind_choices)
+    def create_workdir(self):
+        os.makedirs('{0}/experiments/user_{1}/exp_{2}'.format(
+            self.docker.get_path(), self.user.id, self.id), 0o777)
 
 
-class Graph(models.Model):
+class ElementData(models.Model):
     experiment = models.ForeignKey(
-        Experiment, null=False, blank=False, on_delete=models.CASCADE, related_name='graphs')
-
-
-class Serie(models.Model):
-    graph = models.ForeignKey(
-        Graph, null=False, blank=False, on_delete=models.CASCADE, related_name='series')
-
-
-class Point(models.Model):
-    serie = models.ForeignKey(
-        Serie, null=False, blank=False, on_delete=models.CASCADE, related_name='points')
-    x = models.CharField(max_length=100, null=True, blank=True)
-    y = models.FloatField(max_length=100, null=True, blank=True)
+        Experiment, on_delete=models.CASCADE, related_name='elements')
+    kind = models.CharField(max_length=30)
+    element = models.ForeignKey(Element, on_delete=models.CASCADE)
+    value = models.TextField()

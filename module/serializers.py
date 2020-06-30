@@ -49,6 +49,15 @@ class RetrieveModuleSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class CreateExperimentSerialize(serializers.ModelSerializer):
+    docker = RetrieveModuleSerializer()
+    user = UserSerializer()
+
+    class Meta:
+        model = Experiment
+        fields = '__all__'
+
+
 class CreateModuleSerializer(serializers.ModelSerializer):
     id = serializers.CharField(max_length=32, required=False)
     image_name = serializers.CharField(max_length=32, required=False)

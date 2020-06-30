@@ -6,10 +6,16 @@ from .api import *
 
 urlpatterns = [
     ############# Nuevas rutas ######################
-    path('images/', listImages.as_view(), name="list_images"),
-    path('create/', createModule.as_view(), name="create_module"),
-    path('build/<str:pk>', checkBuild.as_view(), name="check_build"),
+    path('images', listImages.as_view(), name="list_images"),
+
+    path('create', createModule.as_view(), name="create_module"),
     path('stop/<str:pk>', stopContainer.as_view(), name="stop_container"),
+    path('start/<str:pk>', startContainer.as_view(), name="stop_container"),
+    path('delete/<str:pk>', deleteContainer.as_view(), name="delete_container"),
+
+    path('run/<str:pk>', createExperiment.as_view(), name="run_container"),
+
+    path('<str:pk>', retrieveModule.as_view(), name="detail_module"),
     path('', listModule.as_view(), name="list_modules"),
 
     ############# Rutas antiguas #######################

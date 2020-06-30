@@ -10,28 +10,73 @@ import json
 from django.utils.crypto import get_random_string
 import time
 
+from django.core.exceptions import ObjectDoesNotExist
 
-class checkBuild(generics.RetrieveAPIView):
+
+class retrieveModule(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = RetrieveModuleSerializer
 
     def retrieve(self, request, *args, **kwargs):
-        return Response(
-            self.serializer_class(Docker.objects.get(
-                image_name=self.kwargs['pk'])).data
-        )
+        try:
+            return Response(
+                self.serializer_class(Docker.objects.get(
+                    image_name=self.kwargs['pk'])).data
+            )
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
 
 
-class stopContainer(generics.CreateAPIView):
+class deleteContainer(generics.DestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = RetrieveModuleSerializer
 
-    def create(self, request, *args, **kwargs):
-        time.sleep(5)
-        return Response(
-            self.serializer_class(Docker.objects.get(
-                image_name=self.kwargs['pk'])).data
-        )
+    def destroy(self, request, *args, **kwargs):
+        try:
+            docker = Docker.objects.get(image_name=self.kwargs['pk'], state__in=[
+                                        'active', 'stopped', 'building'])
+            docker.delete_module()
+            return Response(
+                self.serializer_class(docker).data
+            )
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
+
+
+class stopContainer(generics.UpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RetrieveModuleSerializer
+
+    def update(self, request, *args, **kwargs):
+        try:
+            docker = Docker.objects.get(
+                image_name=self.kwargs['pk'], state='active')
+            docker.stop_model()
+            return Response(
+                self.serializer_class(docker).data
+            )
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
+
+
+class startContainer(generics.UpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RetrieveModuleSerializer
+
+    def update(self, request, *args, **kwargs):
+        try:
+            docker = Docker.objects.get(
+                image_name=self.kwargs['pk'], state='stopped')
+            docker.run_model()
+            return Response(
+                self.serializer_class(docker).data
+            )
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
 
 
 class listImages(generics.ListAPIView):
@@ -48,9 +93,28 @@ class listModule(generics.ListAPIView):
     serializer_class = ListModuleSerialize
 
     def get_queryset(self):
-        dockers = Docker.objects.all()
-        print(dockers)
-        return dockers
+        print(self.request.user)
+        return Docker.objects.filter(
+            state__in=['building', 'active', 'stopped'])
+
+
+class createExperiment(generics.CreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = CreateExperimentSerialize
+
+    def create(self, request, *args, **kwargs):
+        try:
+            docker = Docker.objects.get(
+                image_name=self.kwargs['pk'], state='active')
+
+            experiment = Experiment.objects.create(
+                docker=docker, user=self.request.user)
+            experiment.create_workdir()
+            print(self.serializer_class(experiment).data)
+            return Response(self.serializer_class(experiment).data)
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
 
 
 class createModule(generics.CreateAPIView):
@@ -64,16 +128,11 @@ class createModule(generics.CreateAPIView):
 
         # verificando la existencia de los datos en el contanedor
         client = docker_env.from_env()
-        # exist_workdir = client.containers.run(
-        #     image=data["image"], command="test -d {0} && echo 'exist'".format(data["workdir"]), detach=True)
-        # exist_file = client.containers.run(
-        #     image=data["image"], command="test -d {0}/{1} && echo 'exist'".format(data["workdir"], data["file"]), detach=True)
-
         try:
             exist_workdir = client.containers.run(
                 image=data["image"], command="test -d {0}".format(data["workdir"]))
         except docker_env.errors.ContainerError as error:
-            return Response({"workdir": ["Path to workdir not found"]}, status=status.HTTP_409_CONFLICT)
+            return Response({"workdir": ["Path to workdir not found in image {}".format(data["image"])]}, status=status.HTTP_409_CONFLICT)
         except docker_env.errors.ImageNotFound as error:
             return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)
 
@@ -81,7 +140,15 @@ class createModule(generics.CreateAPIView):
             exist_file = client.containers.run(
                 image=data["image"], command="ls -d {0}/{1}".format(data["workdir"], data["file"]))
         except docker_env.errors.ContainerError as error:
-            return Response({"file": ["This file not exist in your workdir"]}, status=status.HTTP_409_CONFLICT)
+            return Response({"file": ["This file not exist in your {0}".format(data["workdir"])]}, status=status.HTTP_409_CONFLICT)
+        except docker_env.errors.ImageNotFound as error:
+            return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)
+
+        try:
+            exist_classname = client.containers.run(
+                image=data["image"], command="grep 'class {0}' {1}/{2}".format(data["classname"], data["workdir"], data["file"]))
+        except docker_env.errors.ContainerError as error:
+            return Response({"classname": ["Class not exist in {0}/{1}".format(data["workdir"], data["file"])]}, status=status.HTTP_409_CONFLICT)
         except docker_env.errors.ImageNotFound as error:
             return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)
 

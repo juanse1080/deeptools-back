@@ -61,7 +61,6 @@ class ChatConsumer(WebsocketConsumer):
 
                     index += 1
 
-        module.run_model()
         content = {
             'progress': progress,
             'description': steps[-1][-1],
@@ -69,8 +68,7 @@ class ChatConsumer(WebsocketConsumer):
         }
         item.append(content)
         self.progress_group(item)
-        module.build = False
-        module.save()
+        module.run_model()
 
     commands = {
         'build': build,
