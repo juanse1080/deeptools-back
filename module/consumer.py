@@ -11,7 +11,7 @@ from datetime import datetime
 from django.conf import settings
 
 
-class ChatConsumer(WebsocketConsumer):
+class BuildConsumer(WebsocketConsumer):
     def build(self, data):
         item = []
         index = 0
@@ -68,7 +68,7 @@ class ChatConsumer(WebsocketConsumer):
         }
         item.append(content)
         self.progress_group(item)
-        module.run_model()
+        module.run_container()
 
     commands = {
         'build': build,
@@ -77,6 +77,72 @@ class ChatConsumer(WebsocketConsumer):
     def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["pk"]
         self.room_group_name = 'chat_%s' % self.room_name
+
+        async_to_sync(self.channel_layer.group_add)(
+            self.room_group_name,
+            self.channel_name
+        )
+        self.accept()
+
+    def disconnect(self, close_code):
+        async_to_sync(self.channel_layer.group_discard)(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    def receive(self, text_data):
+        data = json.loads(text_data)
+        self.commands[data['command']](self, data)
+
+    def progress_group(self, message):
+        async_to_sync(self.channel_layer.group_send)(
+            self.room_group_name,
+            {
+                'type': 'send_progress',
+                'message': message
+            }
+        )
+
+    def send_progress(self, event):
+        self.send(text_data=json.dumps(event["message"]))
+
+
+class ExperimentConsumer(WebsocketConsumer):
+    def execute(self, data):
+        item = []
+        experiment = Experiment.objects.get(id=self.room_name)
+        generator = experiment.run()
+        experiment.state = 'executing'
+        experiment.save()
+        for return_ in generator:
+            content = {
+                'progress': return_.state.value,
+                'description': return_.state.description,
+                'state': 'execute'
+            }
+            print(content)
+            item.insert(0, content)
+            self.progress_group(item)
+
+        experiment.state = 'executed'
+        experiment.save()
+        content = {
+            'progress': '100',
+            'description': item[-1]["description"],
+            'state': 'success'
+        }
+        print(content)
+        item.append(content)
+        self.progress_group(item)
+
+    commands = {
+        'execute': execute,
+    }
+
+    def connect(self):
+        self.room_name = self.scope["url_route"]["kwargs"]["pk"]
+        self.user_name = self.scope["user"].id
+        self.room_group_name = f"{self.room_name}_{self.user_name}"
 
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,

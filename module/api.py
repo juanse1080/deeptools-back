@@ -1,16 +1,23 @@
 from django.db import transaction
+from django.utils.crypto import get_random_string
+from django.core.exceptions import ObjectDoesNotExist
+
 from rest_framework import generics
 from rest_framework import authentication, permissions
 from rest_framework import status
 from rest_framework.response import Response
+
 import docker as docker_env
+
 from module.models import *
 from module.serializers import *
-import json
-from django.utils.crypto import get_random_string
-import time
+from module.utils import handle_uploaded_file
 
-from django.core.exceptions import ObjectDoesNotExist
+import os
+import json
+import time
+import string
+import random
 
 
 class retrieveModule(generics.RetrieveAPIView):
@@ -53,7 +60,7 @@ class stopContainer(generics.UpdateAPIView):
         try:
             docker = Docker.objects.get(
                 image_name=self.kwargs['pk'], state='active')
-            docker.stop_model()
+            docker.stop_container()
             return Response(
                 self.serializer_class(docker).data
             )
@@ -70,7 +77,7 @@ class startContainer(generics.UpdateAPIView):
         try:
             docker = Docker.objects.get(
                 image_name=self.kwargs['pk'], state='stopped')
-            docker.run_model()
+            docker.run_container()
             return Response(
                 self.serializer_class(docker).data
             )
@@ -90,31 +97,125 @@ class listImages(generics.ListAPIView):
 
 class listModule(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ListModuleSerialize
+    serializer_class = ListModuleSerializer
 
-    def get_queryset(self):
-        print(self.request.user)
-        return Docker.objects.filter(
-            state__in=['building', 'active', 'stopped'])
+    def list(self, request, *args, **kwargs):
+        others = Docker.objects.filter(
+            state__in=['building', 'stopped'])
+
+        actives = Docker.objects.filter(
+            state='active')
+
+        for active in actives:
+            if not active.check_active_state():
+                active.state = 'stopped'
+                active.save()
+
+        return Response(self.serializer_class(actives.union(others).order_by('timestamp'), many=True).data)
 
 
 class createExperiment(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = CreateExperimentSerialize
+    serializer_class = RetrieveModuleSerializer
 
     def create(self, request, *args, **kwargs):
         try:
             docker = Docker.objects.get(
                 image_name=self.kwargs['pk'], state='active')
 
-            experiment = Experiment.objects.create(
-                docker=docker, user=self.request.user)
-            experiment.create_workdir()
-            print(self.serializer_class(experiment).data)
-            return Response(self.serializer_class(experiment).data)
+            input = docker.elements_type.filter(kind='input').get()
+
+            if int(input.len) > 0:
+                experiment, created = Experiment.objects.get_or_create(
+                    docker=docker, user=self.request.user, state='created')
+                if created:
+                    experiment.create_workdir()
+                experiments = [experiment]
+            else:
+                experiments = Experiment.objects.filter(
+                    docker=docker, user=self.request.user, state='created')
+                if experiments.count() == 0:
+                    experiment = Experiment.objects.create(
+                        docker=docker, user=self.request.user, state='created')
+                    experiment.create_workdir()
+                    experiments = [experiment]
+
+            element_data = []
+            for exp in experiments:
+                for data in exp.elements.all():
+                    element_data.append(data)
+
+            data = dict(**self.serializer_class(docker).data)
+            data["elements"] = RetrieveElementDataSerializer(
+                element_data, many=True).data
+            return Response(data)
         except ObjectDoesNotExist:
             return Response("Module not found",
                             status=status.HTTP_404_NOT_FOUND)
+
+
+class createElementData(generics.CreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RetrieveElementDataSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            docker = Docker.objects.get(
+                image_name=self.kwargs['pk'], state='active')
+
+            input = docker.elements_type.filter(kind='input').get()
+
+            experiment = None
+
+            if int(input.len) > 0:
+                experiment, created = Experiment.objects.get_or_create(
+                    docker=docker, user=self.request.user, state='created')
+                if created:
+                    experiment.create_workdir()
+            else:
+                experiments = Experiment.objects.filter(
+                    docker=docker, user=self.request.user, state='created')
+
+                if experiments.count() > 0:
+                    for exp in experiments:
+                        if exp.elements.all().count() == 0:
+                            experiment = exp
+
+                    if not experiment:
+                        experiment = Experiment.objects.create(
+                            docker=docker, user=self.request.user, state='created')
+                        experiment.create_workdir()
+
+                else:
+                    experiment, created = Experiment.objects.create(
+                        docker=docker, user=self.request.user, state='created')
+                    if created:
+                        experiment.create_workdir()
+
+            file = request.FILES['file']
+
+            element = ElementData.objects.create(
+                experiment=experiment, kind='input', element=Element.objects.get(name='input'), name=file.name)
+
+            element.value = handle_uploaded_file(
+                file, experiment.get_workdir(), 'input_{}'.format(element.id))
+
+            element.save()
+            return Response(self.serializer_class(element).data)
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
+
+
+class DeleteElementData(generics.DestroyAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RetrieveElementDataSerializer
+
+    def delete(self, request, *args, **kwargs):
+        input = ElementData.objects.get(id=self.kwargs['pk'])
+        os.remove('{}/{}'.format(input.experiment.get_workdir(), input.value))
+        input.delete()
+        return Response(True)
 
 
 class createModule(generics.CreateAPIView):
@@ -152,10 +253,10 @@ class createModule(generics.CreateAPIView):
         except docker_env.errors.ImageNotFound as error:
             return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)
 
-        id = '__{}'.format(get_random_string(length=30))
+        id = ''.join([random.choice(string.ascii_letters)
+                      for i in range(32)])
         data['id'] = id
-        data['image_name'] = ''.join(
-            [i for i in id[2:].lower() if not i.isdigit()])
+        data['image_name'] = id.lower()
         data['proto'] = '{0}/protobuf.proto'.format(id)
         data['user'] = self.request.user.id
 
@@ -166,3 +267,46 @@ class createModule(generics.CreateAPIView):
             docker.create_docker()
             return Response(docker.image_name)
         return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+
+
+class executeContainer(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = CreateModuleSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        docker = Docker.objects.get(
+            image_name=self.kwargs['pk'], state='active')
+
+        experiments = Experiment.objects.filter(
+            docker=docker, user=self.request.user, state='created')
+
+        print(experiments)
+
+        for experiment in experiments:
+            experiment.run()
+
+        return Response(True)
+
+
+class listExperiments(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = CreateExperimentSerializer
+
+    def get_queryset(self):
+        return Experiment.objects.filter(state='executing')
+
+
+class retriveExperiment(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = CreateExperimentSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            experiment = Experiment.objects.get(
+                id=self.kwargs['pk'])
+            return Response(
+                self.serializer_class(experiment).data
+            )
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)

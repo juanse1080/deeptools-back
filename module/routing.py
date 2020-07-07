@@ -5,7 +5,8 @@ from django.urls import path
 from . import consumer
 
 websocket_urlpatterns = [
-    path('ws/build/<str:pk>', consumer.ChatConsumer),
+    path('ws/build/<str:pk>', consumer.BuildConsumer),
+    path('ws/execute/<int:pk>', consumer.ExperimentConsumer),
 ]
 
 application = ProtocolTypeRouter({

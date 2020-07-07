@@ -14,6 +14,14 @@ urlpatterns = [
     path('delete/<str:pk>', deleteContainer.as_view(), name="delete_container"),
 
     path('run/<str:pk>', createExperiment.as_view(), name="run_container"),
+    path('experiment', listExperiments.as_view(), name="list_experiments"),
+    path('experiment/<int:pk>', retriveExperiment.as_view(),
+         name="retrieve_experiment"),
+    path('upload/<str:pk>', createElementData.as_view(), name="upload_experiment"),
+    path('upload/remove/<str:pk>', DeleteElementData.as_view(),
+         name="upload_experiment"),
+    path('execute/<str:pk>', executeContainer.as_view(), name="upload_experiment"),
+
 
     path('<str:pk>', retrieveModule.as_view(), name="detail_module"),
     path('', listModule.as_view(), name="list_modules"),

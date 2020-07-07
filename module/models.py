@@ -1,22 +1,27 @@
-from django.db import models
+
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.utils.translation import ugettext_lazy as _
 from django.conf import settings
+from django.db import models
+
+import docker as docker_env
+from channels.layers import get_channel_layer
+
 from authenticate.models import User
 from .utils import *
 from .generate.proto import ProtoFile
 from .generate.server import ServerFile
 from .managers import UserManager
-import shutil
-import os
-import json
 
+import importlib
 import traceback
+import json
+import shutil
 import sys
+import os
 
-import docker as docker_env
-from channels.layers import get_channel_layer
+# import __Rmyw9LxbPBhhegjOy3IjvADs9U1KlT.protobuf_pb2 as objects
 
 
 class Image:
@@ -60,8 +65,26 @@ class Docker(models.Model):
     classname = models.CharField(max_length=100, null=True)
 
     def get_container(self):
-        client = docker_env.from_env()
-        return client.containers.get(self.image_name)
+        try:
+            client = docker_env.from_env()
+            return client.containers.get(self.image_name)
+        except docker_env.errors.NotFound as error:
+            return None
+
+    def check_active_state(self):
+        if self.state == 'active':
+            docker = self.get_container()
+            if docker:
+                return True
+            else:
+                return False
+
+    def get_container_or_run(self):
+        container = self.get_container()
+        if container:
+            return container
+        else:
+            return self.run_container()
 
     def get_path(self):
         return '{0}/{1}'.format(settings.MEDIA_ROOT, self.id)
@@ -146,16 +169,12 @@ class Docker(models.Model):
             },
                 settings.ENV_ROOT
             )
-
-            # self.run_model()
-            # container = self.get_container()
-            # self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
         except:
             exc_type, exc_obj, tb = sys.exc_info()
             print(exc_type)
             print(exc_obj)
             traceback.print_exc()
-            self.__delete_model()
+            self.delete()
         self.save()
         return True
 
@@ -203,10 +222,10 @@ class Docker(models.Model):
                 steps
             )
         except expression as identifier:
-            self.__delete_model()
+            self.delete()
             return [{'stream': "error"}, {'stream': "error"}], [["Error:", "An error occurred during model shrinkage. Check the data and try again"]]
 
-    def run_model(self):
+    def run_container(self):
         try:
             client = docker_env.from_env()
             client.containers.run(
@@ -227,6 +246,7 @@ class Docker(models.Model):
             self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
             self.state = 'active'
             self.save()
+            return container
         except docker_env.errors.ContainerError as error:
             print(error)
             return error
@@ -234,27 +254,31 @@ class Docker(models.Model):
             print(error)
             return error
 
-    def stop_model(self):
-        self.get_container().stop()
-        self.state = 'stopped'
-        self.ip = ''
-        self.save()
+    def stop_container(self):
+        try:
+            self.get_container().stop()
+            self.state = 'stopped'
+            self.ip = ''
+            self.save()
+            return True
+        except docker_env.errors.APIError as error:
+            return False
 
     def delete_module(self):
         if self.state == 'active':
-            self.get_container().stop()
+            self.stop_container()
 
         client = docker_env.from_env()
         client.images.remove(image=self.image_name, force=True)
         self.state = 'deleted'
         self.save()
 
-    def __delete_model(self, delete_img=False):
+    def delete(self, delete_img=False):
         shutil.rmtree(self.get_path())
         shutil.rmtree('{0}{1}'.format(
             settings.ENV_ROOT, self.id
         ))
-        self.delete()
+        super().delete()
 
 
 class ElementType(models.Model):
@@ -283,8 +307,64 @@ class Experiment(models.Model):
     timestamp = models.DateTimeField(auto_now=True)
 
     def create_workdir(self):
-        os.makedirs('{0}/experiments/user_{1}/exp_{2}'.format(
-            self.docker.get_path(), self.user.id, self.id), 0o777)
+        os.makedirs(self.get_workdir(), 0o777)
+
+    def get_workdir(self):
+        return '{0}/experiments/user_{1}/exp_{2}'.format(
+            self.docker.get_path(), self.user.id, self.id)
+
+    def run(self):
+        # print(sys.path)
+        grpc = importlib.import_module('grpc')
+        objects = importlib.import_module(
+            '{}.protobuf_pb2'.format(self.docker.id))
+        services = importlib.import_module(
+            '{}.protobuf_pb2_grpc'.format(self.docker.id))
+
+        channel = grpc.insecure_channel(self.docker.ip)
+
+        stub = services.ServerStub(channel)
+
+        input = self.docker.elements_type.filter(kind='input').get()
+        output = self.docker.elements_type.filter(kind='output').get()
+
+        if int(input.len) > 0:
+            inputs_data = ['{0}/media/user_{1}/exp_{2}/{3}'.format(
+                self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')]
+        else:
+            inputs_data = ['{0}/media/user_{1}/exp_{2}/{3}'.format(
+                self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')][-1]
+
+        if int(output.len) > 0:
+            outputs_data = ['{}/output_{}.mp4'.format('/'.join(output.split('/')[:-1]), index)
+                            for index, output in enumerate(inputs_data)]
+        else:
+            outputs_data = '{}/output_{}.mp4'.format(
+                '/'.join(inputs_data.split('/')[:-1]), 0)
+
+        print(inputs_data, outputs_data)
+
+        def input(value):
+            return objects.Input(value=value)
+
+        def inputs(values):
+            return objects.Inputs(inputs=input(values))
+
+        def output(value):
+            return objects.Output(value=value)
+
+        def outputs(values):
+            return objects.Outputs(outputs=output(values))
+
+        metadata = [('ip', '127.0.0.1')]
+        response = stub.execute(
+            objects.In(
+                inputs=inputs(inputs_data),
+                outputs=outputs(outputs_data),
+            )
+        )
+
+        return response
 
 
 class ElementData(models.Model):
@@ -292,4 +372,5 @@ class ElementData(models.Model):
         Experiment, on_delete=models.CASCADE, related_name='elements')
     kind = models.CharField(max_length=30)
     element = models.ForeignKey(Element, on_delete=models.CASCADE)
-    value = models.TextField()
+    value = models.TextField(null=True)
+    name = models.TextField(null=True)

@@ -10,19 +10,32 @@ class ServerElement(Element):
         getattr(self, self._kind)()
 
     def output(self):
+
         content = 'def generate_outputs(outputs):\n\treturn objects.Outputs('
         if int(self._len) > 0:
-            content += 'outputs=(objects.Outputs(value=output) for output in outputs))\n\n'
+            content += 'outputs=(objects.Output(value=output) for output in outputs))\n\n'
         else:
-            content += 'outputs=objects.Outputs(value=outputs))\n\n'
+            content += 'outputs=objects.Output(value=outputs))\n\n'
+
+        content += 'def outputs_data(outputs):\n'
+        if int(self._len) > 0:
+            content += '\treturn [output.value for output in outputs]\n\n'
+        else:
+            content += '\treturn outputs.value\n\n'
         self.content = content
 
     def input(self):
         content = 'def generate_inputs(inputs):\n\treturn objects.Inputs('
         if int(self._len) > 0:
-            content += 'inputs=(objects.Inputs(value=input) for input in inputs))\n\n'
+            content += 'inputs=(objects.Input(value=input) for input in inputs))\n\n'
         else:
-            content += 'inputs=objects.Inputs(value=inputs))\n\n'
+            content += 'inputs=objects.Input(value=inputs))\n\n'
+
+        content += 'def inputs_data(inputs):\n'
+        if int(self._len) > 0:
+            content += '\treturn [input.value for input in inputs]\n\n'
+        else:
+            content += '\treturn inputs.value\n\n'
         self.content = content
 
     def response(self):
@@ -57,9 +70,6 @@ class ServerFile(File):
         self.content += '\t)\n\n'
 
     def build_in(self):
-        self.content += 'def inputs_data(inputs):\n\treturn [input.value for input in inputs]\n\n'
-        if self._have_outputs:
-            self.content += 'def outputs_data(outputs):\n\treturn [output.value for output in outputs]\n\n'
         self.content += 'def in_data(data):\n\treturn (\n\t\tinputs_data(data.inputs.inputs),\n'
         if self._have_outputs:
             self.content += '\t\toutputs_data(data.outputs.outputs),\n'

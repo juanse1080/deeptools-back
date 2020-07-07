@@ -33,7 +33,7 @@ class ElementTypeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ListModuleSerialize(serializers.ModelSerializer):
+class ListModuleSerializer(serializers.ModelSerializer):
     user = UserSerializer()
 
     class Meta:
@@ -49,10 +49,21 @@ class RetrieveModuleSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class CreateExperimentSerialize(serializers.ModelSerializer):
-    docker = RetrieveModuleSerializer()
-    user = UserSerializer()
+class RetrieveElementDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ElementData
+        fields = '__all__'
 
+
+class CreateExperimentSerializer(serializers.ModelSerializer):
+    docker = RetrieveModuleSerializer()
+
+    class Meta:
+        model = Experiment
+        fields = '__all__'
+
+
+class ListExperimentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experiment
         fields = '__all__'
