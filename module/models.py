@@ -326,54 +326,61 @@ class Experiment(models.Model):
         super().delete()
 
     def run(self):
-        grpc = importlib.import_module('grpc')
-        objects = importlib.import_module(
-            '{}.protobuf_pb2'.format(self.docker.id))
-        services = importlib.import_module(
-            '{}.protobuf_pb2_grpc'.format(self.docker.id))
+        print("####### entro")
+        try:
+            grpc = importlib.import_module('grpc')
+            objects = importlib.import_module(
+                '{}.protobuf_pb2'.format(self.docker.id))
+            services = importlib.import_module(
+                '{}.protobuf_pb2_grpc'.format(self.docker.id))
 
-        channel = grpc.insecure_channel(self.docker.ip)
+            channel = grpc.insecure_channel(self.docker.ip)
 
-        stub = services.ServerStub(channel)
+            stub = services.ServerStub(channel)
 
-        input = self.docker.elements_type.filter(kind='input').get()
+            input = self.docker.elements_type.filter(kind='input').get()
 
-        if int(input.len) > 0:
-            inputs_data = ['{0}/media/user_{1}/exp_{2}/inputs/{3}'.format(
-                self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')]
-        else:
-            inputs_data = ['{0}/media/user_{1}/exp_{2}/inputs/{3}'.format(
-                self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')][-1]
-
-        outputs = self.docker.elements_type.filter(kind='output')
-        have_output = outputs.count() == 1
-
-        if outputs.count() == 1:
-            outputs_data = '{0}/media/user_{1}/exp_{2}/outputs'.format(
-                self.docker.workdir, self.user.id, self.id)
-
-        def get_inputs_obj(values, len):
-            if len > 0:
-                return (objects.Inputs(inputs=objects.Input(value=value)) for value in values)
+            if int(input.len) > 0:
+                inputs_data = ['{0}/media/user_{1}/exp_{2}/inputs/{3}'.format(
+                    self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')]
             else:
-                return objects.Inputs(inputs=objects.Input(value=values))
+                inputs_data = ['{0}/media/user_{1}/exp_{2}/inputs/{3}'.format(
+                    self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')][-1]
 
-        def createIn(inputs, outputs, len, have_output=False):
-            if have_output:
-                return {'inputs': get_inputs_obj(inputs, len), 'output': objects.Output(value=outputs)}
-            else:
-                return {'inputs': get_inputs_obj(inputs, len)}
+            print(inputs_data)
 
-        # print(**createIn(inputs_data, outputs_data, int(input.len), have_output))
+            outputs = self.docker.elements_type.filter(kind='output')
+            have_output = outputs.count() == 1
 
-        metadata = [('ip', '127.0.0.1')]
-        response = stub.execute(
-            objects.In(
-                **createIn(inputs_data, outputs_data, int(input.len), have_output)
+            if outputs.count() == 1:
+                outputs_data = '{0}/media/user_{1}/exp_{2}/outputs'.format(
+                    self.docker.workdir, self.user.id, self.id)
+
+            def get_inputs_obj(values, len):
+                if len > 0:
+                    return (objects.Inputs(inputs=objects.Input(value=value)) for value in values)
+                else:
+                    return objects.Inputs(inputs=objects.Input(value=values))
+
+            def createIn(inputs, outputs, len, have_output=False):
+                if have_output:
+                    return {'inputs': get_inputs_obj(inputs, len), 'output': objects.Output(value=outputs)}
+                else:
+                    return {'inputs': get_inputs_obj(inputs, len)}
+
+            # print(**createIn(inputs_data, outputs_data, int(input.len), have_output))
+
+            metadata = [('ip', '127.0.0.1')]
+            response = stub.execute(
+                objects.In(
+                    **createIn(inputs_data, outputs_data, int(input.len), have_output)
+                )
             )
-        )
 
-        return response
+            return response
+        except ValueError as erro:
+            print("############ ERROR", erro)
+            return ({"progress": 0, "state": 'Error', "description": "Something unexpected happened, try again"})
 
 
 class ElementData(models.Model):

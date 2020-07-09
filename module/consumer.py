@@ -112,9 +112,11 @@ class ExperimentConsumer(WebsocketConsumer):
     def execute(self, data):
         print("execute")
         experiment = Experiment.objects.get(id=self.room_name)
+        print(experiment)
         generator = experiment.run()
         experiment.state = 'executing'
         experiment.save()
+        print("running")
         for return_ in generator:
             content = {
                 'progress': return_.state.value,

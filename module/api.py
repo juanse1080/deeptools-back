@@ -228,7 +228,8 @@ class DeleteElementData(generics.DestroyAPIView):
         input.delete()
 
         experiment = input.experiment
-        experiments = experiment.docker.experiments
+        experiments = experiment.docker.experiments.filter(
+            user=self.request.user, state='created')
         if experiments.count() > 1:
             experiment.delete()
         return Response(True)
