@@ -18,10 +18,7 @@ class ServerElement(Element):
             content += 'outputs=objects.Output(value=outputs))\n\n'
 
         content += 'def outputs_data(outputs):\n'
-        if int(self._len) > 0:
-            content += '\treturn [output.value for output in outputs]\n\n'
-        else:
-            content += '\treturn outputs.value\n\n'
+        content += '\treturn outputs.value\n\n'
         self.content = content
 
     def input(self):
@@ -72,7 +69,7 @@ class ServerFile(File):
     def build_in(self):
         self.content += 'def in_data(data):\n\treturn (\n\t\tinputs_data(data.inputs.inputs),\n'
         if self._have_outputs:
-            self.content += '\t\toutputs_data(data.outputs.outputs),\n'
+            self.content += '\t\toutputs_data(data.output),\n'
         self.content += '\t)\n\n'
 
     def create_server(self, id, file, workdir, class__):

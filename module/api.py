@@ -124,12 +124,18 @@ class createExperiment(generics.CreateAPIView):
                 image_name=self.kwargs['pk'], state='active')
 
             input = docker.elements_type.filter(kind='input').get()
+            output = docker.elements_type.filter(kind='output')
+
+            if output.count() == 0:
+                output = False
+            else:
+                output = True
 
             if int(input.len) > 0:
                 experiment, created = Experiment.objects.get_or_create(
                     docker=docker, user=self.request.user, state='created')
                 if created:
-                    experiment.create_workdir()
+                    experiment.create_workdir(outputs=output)
                 experiments = [experiment]
             else:
                 experiments = Experiment.objects.filter(
@@ -137,7 +143,7 @@ class createExperiment(generics.CreateAPIView):
                 if experiments.count() == 0:
                     experiment = Experiment.objects.create(
                         docker=docker, user=self.request.user, state='created')
-                    experiment.create_workdir()
+                    experiment.create_workdir(outputs=output)
                     experiments = [experiment]
 
             element_data = []
@@ -164,6 +170,12 @@ class createElementData(generics.CreateAPIView):
                 image_name=self.kwargs['pk'], state='active')
 
             input = docker.elements_type.filter(kind='input').get()
+            output = docker.elements_type.filter(kind='output')
+
+            if output.count() == 0:
+                output = False
+            else:
+                output = True
 
             experiment = None
 
@@ -171,7 +183,7 @@ class createElementData(generics.CreateAPIView):
                 experiment, created = Experiment.objects.get_or_create(
                     docker=docker, user=self.request.user, state='created')
                 if created:
-                    experiment.create_workdir()
+                    experiment.create_workdir(outputs=output)
             else:
                 experiments = Experiment.objects.filter(
                     docker=docker, user=self.request.user, state='created')
@@ -184,13 +196,13 @@ class createElementData(generics.CreateAPIView):
                     if not experiment:
                         experiment = Experiment.objects.create(
                             docker=docker, user=self.request.user, state='created')
-                        experiment.create_workdir()
+                        experiment.create_workdir(outputs=output)
 
                 else:
                     experiment, created = Experiment.objects.create(
                         docker=docker, user=self.request.user, state='created')
                     if created:
-                        experiment.create_workdir()
+                        experiment.create_workdir(outputs=output)
 
             file = request.FILES['file']
 
@@ -198,7 +210,7 @@ class createElementData(generics.CreateAPIView):
                 experiment=experiment, kind='input', element=Element.objects.get(name='input'), name=file.name)
 
             element.value = handle_uploaded_file(
-                file, experiment.get_workdir(), 'input_{}'.format(element.id))
+                file, experiment.inputs(), 'input_{}'.format(element.id))
 
             element.save()
             return Response(self.serializer_class(element).data)
@@ -213,8 +225,12 @@ class DeleteElementData(generics.DestroyAPIView):
 
     def delete(self, request, *args, **kwargs):
         input = ElementData.objects.get(id=self.kwargs['pk'])
-        os.remove('{}/{}'.format(input.experiment.get_workdir(), input.value))
         input.delete()
+
+        experiment = input.experiment
+        experiments = experiment.docker.experiments
+        if experiments.count() > 1:
+            experiment.delete()
         return Response(True)
 
 

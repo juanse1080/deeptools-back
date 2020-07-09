@@ -2,6 +2,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer, AsyncJsonWebsocke
 from channels.db import database_sync_to_async
 from asgiref.sync import async_to_sync
 from .models import *
+from .serializers import RecordsSerializer
 import asyncio
 import json
 
@@ -109,7 +110,7 @@ class BuildConsumer(WebsocketConsumer):
 
 class ExperimentConsumer(WebsocketConsumer):
     def execute(self, data):
-        item = []
+        print("execute")
         experiment = Experiment.objects.get(id=self.room_name)
         generator = experiment.run()
         experiment.state = 'executing'
@@ -120,20 +121,18 @@ class ExperimentConsumer(WebsocketConsumer):
                 'description': return_.state.description,
                 'state': 'execute'
             }
-            print(content)
-            item.insert(0, content)
-            self.progress_group(item)
+            Records.objects.create(**content, experiment=experiment)
+            self.progress_group([content])
 
         experiment.state = 'executed'
         experiment.save()
         content = {
             'progress': '100',
-            'description': item[-1]["description"],
+            'description': 'Finalized',
             'state': 'success'
         }
-        print(content)
-        item.append(content)
-        self.progress_group(item)
+        record = Records.objects.create(experiment=experiment, **content)
+        self.progress_group([content])
 
     commands = {
         'execute': execute,
@@ -144,11 +143,17 @@ class ExperimentConsumer(WebsocketConsumer):
         self.user_name = self.scope["user"].id
         self.room_group_name = f"{self.room_name}_{self.user_name}"
 
+        experiment = Experiment.objects.get(id=self.room_name)
+        content = [{'progress': i.progress, 'description': i.description,
+                    'state': i.state} for i in experiment.records.all()]
+
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
             self.channel_name
         )
         self.accept()
+
+        self.send(text_data=json.dumps(content))
 
     def disconnect(self, close_code):
         async_to_sync(self.channel_layer.group_discard)(

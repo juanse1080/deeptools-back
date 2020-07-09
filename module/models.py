@@ -306,15 +306,26 @@ class Experiment(models.Model):
                                on_delete=models.CASCADE, related_name='experiments')
     timestamp = models.DateTimeField(auto_now=True)
 
-    def create_workdir(self):
-        os.makedirs(self.get_workdir(), 0o777)
+    def create_workdir(self, outputs=False):
+        os.makedirs(self.inputs(), 0o777)
+        if outputs:
+            os.makedirs(self.outputs(), 0o777)
+
+    def inputs(self):
+        return f"{self.get_workdir()}/inputs"
+
+    def outputs(self):
+        return f"{self.get_workdir()}/outputs"
 
     def get_workdir(self):
         return '{0}/experiments/user_{1}/exp_{2}'.format(
             self.docker.get_path(), self.user.id, self.id)
 
+    def delete(self):
+        shutil.rmtree(self.get_workdir())
+        super().delete()
+
     def run(self):
-        # print(sys.path)
         grpc = importlib.import_module('grpc')
         objects = importlib.import_module(
             '{}.protobuf_pb2'.format(self.docker.id))
@@ -326,41 +337,39 @@ class Experiment(models.Model):
         stub = services.ServerStub(channel)
 
         input = self.docker.elements_type.filter(kind='input').get()
-        output = self.docker.elements_type.filter(kind='output').get()
 
         if int(input.len) > 0:
-            inputs_data = ['{0}/media/user_{1}/exp_{2}/{3}'.format(
+            inputs_data = ['{0}/media/user_{1}/exp_{2}/inputs/{3}'.format(
                 self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')]
         else:
-            inputs_data = ['{0}/media/user_{1}/exp_{2}/{3}'.format(
+            inputs_data = ['{0}/media/user_{1}/exp_{2}/inputs/{3}'.format(
                 self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')][-1]
 
-        if int(output.len) > 0:
-            outputs_data = ['{}/output_{}.mp4'.format('/'.join(output.split('/')[:-1]), index)
-                            for index, output in enumerate(inputs_data)]
-        else:
-            outputs_data = '{}/output_{}.mp4'.format(
-                '/'.join(inputs_data.split('/')[:-1]), 0)
+        outputs = self.docker.elements_type.filter(kind='output')
+        have_output = outputs.count() == 1
 
-        print(inputs_data, outputs_data)
+        if outputs.count() == 1:
+            outputs_data = '{0}/media/user_{1}/exp_{2}/outputs'.format(
+                self.docker.workdir, self.user.id, self.id)
 
-        def input(value):
-            return objects.Input(value=value)
+        def get_inputs_obj(values, len):
+            if len > 0:
+                return (objects.Inputs(inputs=objects.Input(value=value)) for value in values)
+            else:
+                return objects.Inputs(inputs=objects.Input(value=values))
 
-        def inputs(values):
-            return objects.Inputs(inputs=input(values))
+        def createIn(inputs, outputs, len, have_output=False):
+            if have_output:
+                return {'inputs': get_inputs_obj(inputs, len), 'output': objects.Output(value=outputs)}
+            else:
+                return {'inputs': get_inputs_obj(inputs, len)}
 
-        def output(value):
-            return objects.Output(value=value)
-
-        def outputs(values):
-            return objects.Outputs(outputs=output(values))
+        # print(**createIn(inputs_data, outputs_data, int(input.len), have_output))
 
         metadata = [('ip', '127.0.0.1')]
         response = stub.execute(
             objects.In(
-                inputs=inputs(inputs_data),
-                outputs=outputs(outputs_data),
+                **createIn(inputs_data, outputs_data, int(input.len), have_output)
             )
         )
 
@@ -374,3 +383,15 @@ class ElementData(models.Model):
     element = models.ForeignKey(Element, on_delete=models.CASCADE)
     value = models.TextField(null=True)
     name = models.TextField(null=True)
+
+    def delete(self):
+        os.remove('{}/{}'.format(self.experiment.inputs(), self.value))
+        super().delete()
+
+
+class Records(models.Model):
+    experiment = models.ForeignKey(
+        Experiment, on_delete=models.CASCADE, related_name='records')
+    description = models.CharField(max_length=200)
+    progress = models.CharField(max_length=30)
+    state = models.CharField(max_length=20, default='execute')

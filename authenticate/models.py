@@ -4,6 +4,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
 
+
 class User(AbstractBaseUser, PermissionsMixin):
 
     role_choices = (
@@ -11,7 +12,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('creator', 'Creator'),
         ('user', 'User'),
     )
-    id = models.CharField(primary_key=True, max_length=15, unique=True)
     role = models.CharField(max_length=10, choices=role_choices)
     birth = models.DateField(null=True)
     first_name = models.CharField(max_length=35)

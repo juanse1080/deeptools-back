@@ -61,7 +61,7 @@ class ProtoFile(File):
     def build_in(self):
         self.content += '// ----------- In message ------------\n\nmessage In {\n\tInputs inputs = 1;\n'
         if self._have_outputs:
-            self.content += '\tOutputs outputs = 2;\n'
+            self.content += '\tOutput output = 2;\n'
         self.content += '}\n\n'
 
     def create_protobuf(self):

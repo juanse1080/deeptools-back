@@ -17,6 +17,12 @@ class CreateElementsType(serializers.Serializer):
     value = serializers.CharField()
 
 
+class RecordsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Records
+        fields = '__all__'
+
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
