@@ -82,7 +82,7 @@ class User(AbstractBaseUser, PermissionsMixin):
                 {str}
                     This is user identification
         """
-        return self.id
+        return str(self.id)
 
     def show(self):
         """

@@ -9,6 +9,7 @@ urlpatterns = [
     path('images', listImages.as_view(), name="list_images"),
 
     path('create', createModule.as_view(), name="create_module"),
+    path('check', checkPermissionsAPI, name="check_permissions"),
     path('stop/<str:pk>', stopContainer.as_view(), name="stop_container"),
     path('start/<str:pk>', startContainer.as_view(), name="stop_container"),
     path('delete/<str:pk>', deleteContainer.as_view(), name="delete_container"),

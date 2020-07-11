@@ -2,10 +2,9 @@ from django.db import transaction
 from django.utils.crypto import get_random_string
 from django.core.exceptions import ObjectDoesNotExist
 
-from rest_framework import generics
-from rest_framework import authentication, permissions
-from rest_framework import status
+from rest_framework import generics, mixins, authentication, permissions, status
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
 
 import docker as docker_env
 
@@ -18,6 +17,24 @@ import json
 import time
 import string
 import random
+
+
+class CheckPermissions(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if not request.method == "POST":
+            return False
+        print(request)
+        return request.user.has_perms(request.data["permissions"])
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def checkPermissionsAPI(request):
+    if request.user.has_perms(request.data["permissions"]):
+        return Response(True)
+    else:
+        return Response("Permission denied",
+                        status=status.HTTP_403_FORBIDDEN)
 
 
 class retrieveModule(generics.RetrieveAPIView):
@@ -100,16 +117,35 @@ class listModule(generics.ListAPIView):
     serializer_class = ListModuleSerializer
 
     def list(self, request, *args, **kwargs):
-        others = Docker.objects.filter(
-            state__in=['building', 'stopped'])
+        role = self.request.user.role
 
-        actives = Docker.objects.filter(
-            state='active')
+        if role == 'admin':
+            others = Docker.objects.filter(
+                state__in=['building', 'stopped'])
 
-        for active in actives:
-            if not active.check_active_state():
-                active.state = 'stopped'
-                active.save()
+            actives = Docker.objects.filter(
+                state='active')
+
+            for active in actives:
+                if not active.check_active_state():
+                    active.state = 'stopped'
+                    active.save()
+
+        elif role == 'developer':
+            others = Docker.objects.filter(
+                state__in=['building', 'stopped'], user=self.request.user)
+
+            actives = Docker.objects.filter(
+                state='active', user=self.request.user)
+
+            for active in actives:
+                if not active.check_active_state():
+                    active.state = 'stopped'
+                    active.save()
+
+        else:
+            others = Docker.objects.filter(state='active')
+            return Response(self.serializer_class(others.order_by('timestamp'), many=True).data)
 
         return Response(self.serializer_class(actives.union(others).order_by('timestamp'), many=True).data)
 
@@ -235,11 +271,22 @@ class DeleteElementData(generics.DestroyAPIView):
         return Response(True)
 
 
+class checkCreateModule(generics.CreateAPIView):
+    permission_classes = [permissions.DjangoModelPermissions]
+    serializer_class = CreateModuleSerializer
+
+    def create(self, request, *args, **kwargs):
+        return Response(True)
+
+
 class createModule(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CreateModuleSerializer
 
     def create(self, request, *args, **kwargs):
+        # verificando permisos
+        if not self.request.user.has_perm('module.add_docker'):
+            return Response("Permission denied", status=status.HTTP_403_FORBIDDEN)
 
         # Cargando los datos
         data = dict(request.data)
