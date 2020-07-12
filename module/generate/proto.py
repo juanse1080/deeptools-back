@@ -64,8 +64,9 @@ class ProtoFile(File):
             self.content += '\tOutput output = 2;\n'
         self.content += '}\n\n'
 
-    def create_protobuf(self):
+    def create_protobuf(self, package):
         self.content += 'syntax = "proto3"; \n\n'
+        self.content += f'package {package}; \n\n'
         self.content += '// ----------- Server service ------------\n\nservice Server {\n\trpc execute(In) returns (stream Return);\n}\n\n'
         self.content += '// ----------- State message ------------\n\nmessage State {\n\tstring value = 1;\n\tstring description = 2;\n}\n\n'
         self.content += '// ----------- Return message ------------\n\nmessage Return {\n\tState state = 1;\n\tElements elements = 2;\n}\n\n'

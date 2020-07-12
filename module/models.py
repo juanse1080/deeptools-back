@@ -131,7 +131,7 @@ class Docker(models.Model):
                 'len': element.len
             } for element in self.elements_type.all()])
 
-            file_.write(proto.create_protobuf())
+            file_.write(proto.create_protobuf(self.image_name))
 
     def server(self):
         server = '{0}/{1}/server.py'.format(settings.MEDIA_ROOT, self.id)
@@ -174,7 +174,7 @@ class Docker(models.Model):
             print(exc_type)
             print(exc_obj)
             traceback.print_exc()
-            self.delete()
+            # self.delete()
         self.save()
         return True
 
@@ -264,21 +264,27 @@ class Docker(models.Model):
         except docker_env.errors.APIError as error:
             return False
 
+    def delete_image(self):
+        try:
+            client = docker_env.from_env()
+            client.images.remove(image=self.image_name, force=True)
+        except docker_env.errors.ImageNotFound as error:
+            print(error)
+
     def delete_module(self):
         if self.state == 'active':
             self.stop_container()
 
-        client = docker_env.from_env()
-        client.images.remove(image=self.image_name, force=True)
+        self.delete_image()
         self.state = 'deleted'
         self.save()
 
     def delete(self, delete_img=False):
+        super().delete()
         shutil.rmtree(self.get_path())
         shutil.rmtree('{0}{1}'.format(
             settings.ENV_ROOT, self.id
         ))
-        super().delete()
 
 
 class ElementType(models.Model):
@@ -326,7 +332,6 @@ class Experiment(models.Model):
         super().delete()
 
     def run(self):
-        print("####### entro")
         try:
             grpc = importlib.import_module('grpc')
             objects = importlib.import_module(
@@ -378,6 +383,9 @@ class Experiment(models.Model):
             )
 
             return response
+        except grpc.RpcError as e:
+            print('###### CreateUser failed with {0}: {1}'.format(
+                e.code(), e.details()))
         except ValueError as erro:
             print("############ ERROR", erro)
             return ({"progress": 0, "state": 'Error', "description": "Something unexpected happened, try again"})
@@ -390,6 +398,15 @@ class ElementData(models.Model):
     element = models.ForeignKey(Element, on_delete=models.CASCADE)
     value = models.TextField(null=True)
     name = models.TextField(null=True)
+
+    def rename_output(self):
+        if self.kind == "output":
+            ext = self.name.split('.')[-1]
+            new_name = f"output_{self.id}"
+            self.value = f"{new_name}.{ext}"
+            os.rename(f"{self.experiment.outputs()}/{self.name}",
+                      f"{self.experiment.outputs()}/{self.value}")
+            self.save()
 
     def delete(self):
         os.remove('{}/{}'.format(self.experiment.inputs(), self.value))

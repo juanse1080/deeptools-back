@@ -108,32 +108,67 @@ class BuildConsumer(WebsocketConsumer):
         self.send(text_data=json.dumps(event["message"]))
 
 
+def obj_to_data(experiment, elements):
+    # outputs elements
+    outputs = experiment.docker.elements_type.filter(kind='output')
+    path = '{0}/media/user_{1}/exp_{2}/outputs/'.format(
+        experiment.docker.workdir, experiment.user.id, experiment.id)
+    print(path)
+    if outputs.count() == 1:
+        if int(outputs.get().len) > 0:
+            for output in elements.outputs:
+                element = ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
+                    name='output'), name=output.outputs.value.split(path)[1])
+                element.rename_output()
+        else:
+            element = ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
+                name='output'), name=elements.outputs.outputs.value.split(path)[1])
+            element.rename_output()
+
+    # responses elements
+    ElementData.objects.create(experiment=experiment, kind='response', element=Element.objects.get(
+        name='response'), value=elements.responses.value)
+
+    # graphs elements
+    graphs = experiment.docker.elements_type.filter(kind='graph')
+    if graphs.count() == 1:
+        if int(graphs.get().len) > 0:
+            ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
+                name='output'), value=json.dumps([[point.points.x, point.points.y] for serie in elements.graphs.graphs for point in serie.series]))
+        else:
+            ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
+                name='output'), value=json.dumps([[serie.points.x, serie.points.y] for serie in elements.graphs.graphs.series]))
+    elif graphs.count() > 1:
+        for index, graph in enumerate(elements.graphs):
+            if int(graphs[index].len) > 0:
+                ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
+                    name='output'), value=json.dumps([[point.points.x, point.points.y] for serie in graph.graphs for point in serie.series]))
+            else:
+                ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
+                    name='output'), value=json.dumps([[serie.points.x, serie.points.y] for serie in graph.graphs.series]))
+
+
 class ExperimentConsumer(WebsocketConsumer):
     def execute(self, data):
-        print("execute")
         experiment = Experiment.objects.get(id=self.room_name)
-        print(experiment)
         generator = experiment.run()
         experiment.state = 'executing'
         experiment.save()
-        print("running")
         for return_ in generator:
+            if int(float(return_.state.value)) == 100:
+                print(return_)
+                obj_to_data(experiment, return_.elements)
+
             content = {
                 'progress': return_.state.value,
                 'description': return_.state.description,
-                'state': 'execute'
+                'state': 'success' if int(float(return_.state.value)) == 100 else 'execute'
             }
             Records.objects.create(**content, experiment=experiment)
             self.progress_group([content])
 
         experiment.state = 'executed'
         experiment.save()
-        content = {
-            'progress': '100',
-            'description': 'Finalized',
-            'state': 'success'
-        }
-        record = Records.objects.create(experiment=experiment, **content)
         self.progress_group([content])
 
     commands = {
