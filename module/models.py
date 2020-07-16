@@ -52,13 +52,15 @@ class Docker(models.Model):
     proto = models.CharField(max_length=500, null=True)
     timestamp = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(
-        User, null=True, on_delete=models.CASCADE, related_name='owner')
+        User, on_delete=models.CASCADE, related_name='owner')
+    subscribers = models.ManyToManyField(User, related_name='subscriptions')
     language = models.CharField(
         max_length=100, choices=lenguaje_choices, default='python')
 
     protocol = models.TextField()
 
     name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(null=True)
     image = models.CharField(max_length=100, null=True)
     workdir = models.CharField(max_length=500, null=True)
     file = models.CharField(max_length=100, null=True)
@@ -74,10 +76,7 @@ class Docker(models.Model):
     def check_active_state(self):
         if self.state == 'active':
             docker = self.get_container()
-            if docker:
-                return True
-            else:
-                return False
+            return True if docker else False
 
     def get_container_or_run(self):
         container = self.get_container()
@@ -86,8 +85,11 @@ class Docker(models.Model):
         else:
             return self.run_container()
 
+    def get_public_path(self):
+        return f'{settings.MEDIA_URL}{self.id}'
+
     def get_path(self):
-        return '{0}/{1}'.format(settings.MEDIA_ROOT, self.id)
+        return f'{settings.MEDIA_ROOT}/{self.id}'
 
     def create_folders(self):
         os.makedirs('{0}/experiments'.format(self.get_path()), 0o777)
@@ -256,11 +258,17 @@ class Docker(models.Model):
 
     def stop_container(self):
         try:
-            self.get_container().stop()
-            self.state = 'stopped'
-            self.ip = ''
-            self.save()
-            return True
+            container = self.get_container()
+            if container:
+                self.get_container().stop()
+                self.state = 'stopped'
+                self.ip = ''
+                self.save()
+                return True
+            return False
+        except ValueError as error:
+            print(error)
+            return False
         except docker_env.errors.APIError as error:
             return False
 
@@ -281,10 +289,9 @@ class Docker(models.Model):
 
     def delete(self, delete_img=False):
         super().delete()
-        shutil.rmtree(self.get_path())
+        shutil.rmtree(self.get_path(), ignore_errors=True)
         shutil.rmtree('{0}{1}'.format(
-            settings.ENV_ROOT, self.id
-        ))
+            settings.ENV_ROOT, self.id), ignore_errors=True)
 
 
 class ElementType(models.Model):
@@ -323,6 +330,9 @@ class Experiment(models.Model):
     def outputs(self):
         return f"{self.get_workdir()}/outputs"
 
+    def get_public_path(self):
+        return f"{self.docker.get_public_path()}/experiments/user_{self.user.id}/exp_{self.id}"
+
     def get_workdir(self):
         return '{0}/experiments/user_{1}/exp_{2}'.format(
             self.docker.get_path(), self.user.id, self.id)
@@ -333,15 +343,8 @@ class Experiment(models.Model):
 
     def run(self):
         try:
-            grpc = importlib.import_module('grpc')
             objects = importlib.import_module(
                 '{}.protobuf_pb2'.format(self.docker.id))
-            services = importlib.import_module(
-                '{}.protobuf_pb2_grpc'.format(self.docker.id))
-
-            channel = grpc.insecure_channel(self.docker.ip)
-
-            stub = services.ServerStub(channel)
 
             input = self.docker.elements_type.filter(kind='input').get()
 
@@ -352,10 +355,10 @@ class Experiment(models.Model):
                 inputs_data = ['{0}/media/user_{1}/exp_{2}/inputs/{3}'.format(
                     self.docker.workdir, self.user.id, self.id, data.value) for data in self.elements.filter(kind='input')][-1]
 
-            print(inputs_data)
-
             outputs = self.docker.elements_type.filter(kind='output')
             have_output = outputs.count() == 1
+
+            print(inputs_data)
 
             if outputs.count() == 1:
                 outputs_data = '{0}/media/user_{1}/exp_{2}/outputs'.format(
@@ -373,19 +376,10 @@ class Experiment(models.Model):
                 else:
                     return {'inputs': get_inputs_obj(inputs, len)}
 
-            # print(**createIn(inputs_data, outputs_data, int(input.len), have_output))
-
-            metadata = [('ip', '127.0.0.1')]
-            response = stub.execute(
-                objects.In(
-                    **createIn(inputs_data, outputs_data, int(input.len), have_output)
-                )
+            return objects.In(
+                **createIn(inputs_data, outputs_data, int(input.len), have_output)
             )
 
-            return response
-        except grpc.RpcError as e:
-            print('###### CreateUser failed with {0}: {1}'.format(
-                e.code(), e.details()))
         except ValueError as erro:
             print("############ ERROR", erro)
             return ({"progress": 0, "state": 'Error', "description": "Something unexpected happened, try again"})
@@ -407,9 +401,24 @@ class ElementData(models.Model):
             os.rename(f"{self.experiment.outputs()}/{self.name}",
                       f"{self.experiment.outputs()}/{self.value}")
             self.save()
+        else:
+            raise Exception("This is not a kind output")
+
+    def get_root_path(self):
+        if self.kind == "input":
+            return '{}/{}'.format(self.experiment.inputs(), self.value)
+        if self.kind == "output":
+            return'{}/{}'.format(self.experiment.outputs(), self.value)
+
+    def get_public_path(self):
+        if self.kind == "input":
+            return f"{self.experiment.get_public_path()}/inputs/{self.value}"
+        if self.kind == "output":
+            return f"{self.experiment.get_public_path()}/outputs/{self.value}"
+        return None
 
     def delete(self):
-        os.remove('{}/{}'.format(self.experiment.inputs(), self.value))
+        os.remove(self.get_root_path())
         super().delete()
 
 

@@ -92,3 +92,11 @@ class User(AbstractBaseUser, PermissionsMixin):
                     This is user in dict format
         """
         return self.__dict__
+
+
+class Notification(models.Model):
+    title = models.CharField(max_length=100)
+    kind = models.CharField(max_length=10)
+    description = models.TextField(null=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)

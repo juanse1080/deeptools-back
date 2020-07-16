@@ -94,7 +94,8 @@ class startContainer(generics.UpdateAPIView):
         try:
             docker = Docker.objects.get(
                 image_name=self.kwargs['pk'], state='stopped')
-            docker.run_container()
+            err = docker.run_container()
+            print(err)
             return Response(
                 self.serializer_class(docker).data
             )
@@ -271,14 +272,6 @@ class DeleteElementData(generics.DestroyAPIView):
         return Response(True)
 
 
-class checkCreateModule(generics.CreateAPIView):
-    permission_classes = [permissions.DjangoModelPermissions]
-    serializer_class = CreateModuleSerializer
-
-    def create(self, request, *args, **kwargs):
-        return Response(True)
-
-
 class createModule(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CreateModuleSerializer
@@ -360,16 +353,30 @@ class listExperiments(generics.ListAPIView):
         return Experiment.objects.filter(state='executing')
 
 
-class retriveExperiment(generics.RetrieveAPIView):
+class retrieveExperiment(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CreateExperimentSerializer
 
     def retrieve(self, request, *args, **kwargs):
         try:
             experiment = Experiment.objects.get(
-                id=self.kwargs['pk'])
+                id=self.kwargs['pk'], user=self.request.user)
+            data = dict(self.serializer_class(experiment).data)
+            data["elements"] = {}
+            data["docker"] = ListModuleSerializer(experiment.docker).data
+            data["experiments"] = [str(i.id) for i in experiment.docker.experiments.filter(
+                user=self.request.user).all()]
+
+            for element in experiment.elements.all():
+                if element.kind in data["elements"]:
+                    data["elements"][element.kind].append(
+                        element.get_public_path() if element.get_public_path() else element.value)
+                else:
+                    data["elements"][element.kind] = [
+                        element.get_public_path() if element.get_public_path() else element.value]
+
             return Response(
-                self.serializer_class(experiment).data
+                data
             )
         except ObjectDoesNotExist:
             return Response("Module not found",

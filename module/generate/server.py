@@ -73,14 +73,14 @@ class ServerFile(File):
         self.content += '\t)\n\n'
 
     def create_server(self, id, file, workdir, class__):
-        self.content += 'import grpc\nfrom concurrent import futures\nimport threading\nimport time\nimport sys\nsys.path.insert(0, "{2}/{0}")\nfrom {0} import protobuf_pb2 as objects\nfrom {0} import protobuf_pb2_grpc as services\nimport {1}\n_ONE_DAY_IN_SECONDS = 60 * 60 * 24\n\n'.format(
+        self.content += 'import grpc\nfrom concurrent import futures\nimport time\nimport sys\nsys.path.insert(0, "{2}/{0}")\nfrom {0} import protobuf_pb2 as objects\nfrom {0} import protobuf_pb2_grpc as services\nimport {1}\n_ONE_DAY_IN_SECONDS = 60 * 60 * 24\n\n'.format(
             id, file, workdir)
 
         self.get_content()
         self.build_in()
         self.build_elements()
 
-        self.content += 'class ServerServicer(services.ServerServicer):\n\tdef execute(self, request, context):\n\t\tclass_ = {0}.{1}(*in_data(request))\n\t\tstate = class_.state__\n\t\tthread = threading.Thread(target=class_.run)\n\t\tthread.start()\n\t\twhile class_.state__ < 100:\n\t\t\tif state != class_.state__:\n\t\t\t\tstate = class_.state__\n\t\t\t\tyield objects.Return(\n\t\t\t\t\tstate=objects.State(\n\t\t\t\t\t\tvalue=str(class_.state__),\n\t\t\t\t\t\tdescription=class_.description__\n\t\t\t\t\t)\n\t\t\t\t)\n\t\tthread.join()\n\t\tyield objects.Return(\n\t\t\tstate=objects.State(\n\t\t\t\tvalue=str(class_.state__),\n\t\t\t\tdescription=class_.description__\n\t\t\t),\n\t\t\telements=data_return(class_)\n\t\t)\ndef serve():\n\tserver = grpc.server(futures.ThreadPoolExecutor(max_workers=1000))\n\tservices.add_ServerServicer_to_server(ServerServicer(), server)\n\tserver.add_insecure_port("[::]:50051")\n\tserver.start()\n\ttry:\n\t\twhile True:\n\t\t\ttime.sleep(_ONE_DAY_IN_SECONDS)\n\texcept KeyboardInterrupt:\n\t\tserver.stop(0)\nif __name__ == "__main__":\n\tserve()\n'.format(
+        self.content += 'class ServerServicer(services.ServerServicer):\n\tdef execute(self, request, context):\n\t\tclass_ = {0}.{1}(*in_data(request))\n\t\tstate = class_.state__\n\t\twith futures.ThreadPoolExecutor(max_workers=1) as executor:\n\t\t\tfuture = executor.submit(class_.run)\n\t\t\twhile future.running():\n\t\t\t\tif state != class_.state__:\n\t\t\t\t\tstate = class_.state__\n\t\t\t\t\tyield objects.Return(\n\t\t\t\t\t\tstate=objects.State(\n\t\t\t\t\t\t\tvalue=str(class_.state__),\n\t\t\t\t\t\t\tdescription=class_.description__\n\t\t\t\t\t\t)\n\t\t\t\t\t)\n\t\t\tfuture.result()\n\t\tyield objects.Return(\n\t\t\tstate=objects.State(\n\t\t\t\tvalue=str(class_.state__),\n\t\t\t\tdescription=class_.description__\n\t\t\t),\n\t\t\telements=data_return(class_)\n\t\t)\n\ndef serve():\n\tserver = grpc.server(futures.ThreadPoolExecutor(max_workers=1000))\n\tservices.add_ServerServicer_to_server(ServerServicer(), server)\n\tserver.add_insecure_port("[::]:50051")\n\tserver.start()\n\ttry:\n\t\twhile True:\n\t\t\ttime.sleep(_ONE_DAY_IN_SECONDS)\n\texcept KeyboardInterrupt:\n\t\tserver.stop(0)\nif __name__ == "__main__":\n\tserve()\n'.format(
             file, class__)
 
         return self.content

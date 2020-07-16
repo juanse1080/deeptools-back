@@ -125,7 +125,6 @@ def obj_to_data(experiment, elements):
                 name='output'), name=elements.outputs.outputs.value.split(path)[1])
             element.rename_output()
 
-    # responses elements
     ElementData.objects.create(experiment=experiment, kind='response', element=Element.objects.get(
         name='response'), value=elements.responses.value)
 
@@ -151,25 +150,53 @@ def obj_to_data(experiment, elements):
 class ExperimentConsumer(WebsocketConsumer):
     def execute(self, data):
         experiment = Experiment.objects.get(id=self.room_name)
-        generator = experiment.run()
-        experiment.state = 'executing'
-        experiment.save()
-        for return_ in generator:
-            if int(float(return_.state.value)) == 100:
-                print(return_)
-                obj_to_data(experiment, return_.elements)
+
+        grpc = importlib.import_module('grpc')
+        services = importlib.import_module(
+            '{}.protobuf_pb2_grpc'.format(experiment.docker.id))
+        channel = grpc.insecure_channel(experiment.docker.ip)
+        stub = services.ServerStub(channel)
+
+        try:
+            generator = stub.execute(
+                experiment.run()
+            )
+            experiment.state = 'executing'
+            experiment.save()
+
+            for return_ in generator:
+                content = {
+                    'progress': return_.state.value,
+                    'description': return_.state.description,
+                    'state': 'execute'
+                }
+                data = return_
+                Records.objects.create(**content, experiment=experiment)
+                self.progress_group([content])
+
+            print(data.elements)
+            obj_to_data(experiment, data.elements)
 
             content = {
-                'progress': return_.state.value,
-                'description': return_.state.description,
-                'state': 'success' if int(float(return_.state.value)) == 100 else 'execute'
+                'progress': data.state.value,
+                'description': data.state.description,
+                'state': 'success'
+            }
+            Records.objects.create(**content, experiment=experiment)
+            experiment.state = 'executed'
+            experiment.save()
+            self.progress_group([content])
+        except grpc.RpcError as e:
+            content = {
+                'progress': experiment.records.last().progress,
+                'description': "An error occurred in the server, our team will contact you when it is solved",
+                'state': 'error'
             }
             Records.objects.create(**content, experiment=experiment)
             self.progress_group([content])
 
-        experiment.state = 'executed'
-        experiment.save()
-        self.progress_group([content])
+            print('###### CreateUser failed with {0}: {1}'.format(
+                e.code(), e.details()), e, dir(e))
 
     commands = {
         'execute': execute,

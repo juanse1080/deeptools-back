@@ -69,15 +69,27 @@ class CreateExperimentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class RetriveExperimentSerializer(serializers.ModelSerializer):
+    docker = RetrieveModuleSerializer()
+
+    class Meta:
+        model = Experiment
+        fields = '__all__'
+
+
 class ListExperimentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experiment
         fields = '__all__'
 
 
+class ListExperimentIdSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Experiment
+        fields = ['id']
+
+
 class CreateModuleSerializer(serializers.ModelSerializer):
-    id = serializers.CharField(max_length=32, required=False)
-    image_name = serializers.CharField(max_length=32, required=False)
     elements = CreateElementsType(many=True)
 
     def create(self, validated_data):
@@ -97,4 +109,5 @@ class CreateModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Docker
-        fields = '__all__'
+        fields = ['id', 'image_name', 'proto', 'user', 'protocol',
+                  'name', 'description', 'image', 'workdir', 'file', 'classname', 'elements']

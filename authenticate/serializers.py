@@ -2,6 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User
+from module.models import *
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -30,3 +31,25 @@ class MyTokenObtainPairSerializer(TokenObtainSerializer):
         data['user']['role'] = user['role']
 
         return data
+
+
+class ListModuleSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = Docker
+        fields = '__all__'
+
+
+class RetrieveRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Records
+        fields = '__all__'
+
+
+class ListExperimentSerializer(serializers.ModelSerializer):
+    records = RetrieveRecordSerializer(many=True)
+
+    class Meta:
+        model = Experiment
+        fields = '__all__'
