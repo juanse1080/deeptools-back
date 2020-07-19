@@ -69,7 +69,7 @@ class BuildConsumer(WebsocketConsumer):
         }
         item.append(content)
         self.progress_group(item)
-        module.run_container()
+        module.run_container(builded=True)
 
     commands = {
         'build': build,
@@ -151,6 +151,15 @@ class ExperimentConsumer(WebsocketConsumer):
     def execute(self, data):
         experiment = Experiment.objects.get(id=self.room_name)
 
+        if experiment.docker.state == 'builded':
+            if not experiment.docker.user.id == self.user_name:
+                content = {
+                    'progress': 0,
+                    'description': "Permission denied",
+                    'state': 'error'
+                }
+                self.progress_group([content])
+
         grpc = importlib.import_module('grpc')
         services = importlib.import_module(
             '{}.protobuf_pb2_grpc'.format(experiment.docker.id))
@@ -185,6 +194,11 @@ class ExperimentConsumer(WebsocketConsumer):
             Records.objects.create(**content, experiment=experiment)
             experiment.state = 'executed'
             experiment.save()
+
+            if experiment.docker.state == 'builded':
+                experiment.docker.state = 'active'
+                experiment.docker.save()
+
             self.progress_group([content])
         except grpc.RpcError as e:
             content = {
@@ -192,6 +206,8 @@ class ExperimentConsumer(WebsocketConsumer):
                 'description': "An error occurred in the server, our team will contact you when it is solved",
                 'state': 'error'
             }
+            experiment.state = "error"
+            experiment.save()
             Records.objects.create(**content, experiment=experiment)
             self.progress_group([content])
 

@@ -17,7 +17,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=35)
     last_name = models.CharField(max_length=35)
     email = models.CharField(max_length=60, unique=True)
-    timestamp = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     is_staff = models.BooleanField(
         _('staff status'),
         default=False,
@@ -100,3 +101,5 @@ class Notification(models.Model):
     description = models.TextField(null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

@@ -10,4 +10,6 @@ urlpatterns = [
 
     path('subscriptions/<str:pk>', listTests.as_view(), name='tests'),
     path('subscriptions/', listSubscriptions.as_view(), name='subscriptions'),
+    path('experiment/delete/<str:pk>',
+         deleteExperiments.as_view(), name='remove_experiment'),
 ]

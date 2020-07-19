@@ -61,6 +61,14 @@ class RetrieveElementDataSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ListExamplesModule(serializers.ModelSerializer):
+    href = serializers.TimeField()
+
+    class Meta:
+        model = ElementData
+        fields = '__all__'
+
+
 class CreateExperimentSerializer(serializers.ModelSerializer):
     docker = RetrieveModuleSerializer()
 

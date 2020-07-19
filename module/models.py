@@ -15,6 +15,7 @@ from .generate.server import ServerFile
 from .managers import UserManager
 
 import importlib
+import shutil
 import traceback
 import json
 import shutil
@@ -50,7 +51,6 @@ class Docker(models.Model):
         max_length=10, choices=state_choices, default='building')
     ip = models.CharField(max_length=30, null=True)
     proto = models.CharField(max_length=500, null=True)
-    timestamp = models.DateTimeField(auto_now=True)
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='owner')
     subscribers = models.ManyToManyField(User, related_name='subscriptions')
@@ -58,6 +58,8 @@ class Docker(models.Model):
         max_length=100, choices=lenguaje_choices, default='python')
 
     protocol = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True)
@@ -227,7 +229,7 @@ class Docker(models.Model):
             self.delete()
             return [{'stream': "error"}, {'stream': "error"}], [["Error:", "An error occurred during model shrinkage. Check the data and try again"]]
 
-    def run_container(self):
+    def run_container(self, builded=False):
         try:
             client = docker_env.from_env()
             client.containers.run(
@@ -246,7 +248,7 @@ class Docker(models.Model):
             )
             container = self.get_container()
             self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
-            self.state = 'active'
+            self.state = 'builded' if builded else 'active'
             self.save()
             return container
         except docker_env.errors.ContainerError as error:
@@ -317,7 +319,8 @@ class Experiment(models.Model):
                              on_delete=models.CASCADE, related_name='experiments')
     docker = models.ForeignKey(Docker, null=True, blank=False,
                                on_delete=models.CASCADE, related_name='experiments')
-    timestamp = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def create_workdir(self, outputs=False):
         os.makedirs(self.inputs(), 0o777)
@@ -392,6 +395,7 @@ class ElementData(models.Model):
     element = models.ForeignKey(Element, on_delete=models.CASCADE)
     value = models.TextField(null=True)
     name = models.TextField(null=True)
+    example = models.BooleanField(default=False)
 
     def rename_output(self):
         if self.kind == "output":
@@ -403,6 +407,14 @@ class ElementData(models.Model):
             self.save()
         else:
             raise Exception("This is not a kind output")
+
+    def copy_input(self, to):
+        print(to)
+        if self.kind == "input":
+            shutil.copyfile(self.get_root_path(), to)
+            return to.split('/')[-1]
+        else:
+            raise Exception("This is not a kind input")
 
     def get_root_path(self):
         if self.kind == "input":
