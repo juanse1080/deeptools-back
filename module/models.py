@@ -430,7 +430,8 @@ class ElementData(models.Model):
         return None
 
     def delete(self):
-        os.remove(self.get_root_path())
+        if os.path.exists(self.get_root_path()):
+            os.remove(self.get_root_path())
         super().delete()
 
 

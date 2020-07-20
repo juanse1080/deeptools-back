@@ -1,56 +1,39 @@
 from django.conf.urls import include, url
 from django.urls import path
 from . import views
-from .api import *
+from .api import module, experiment
 # from django.contrib.auth.views import login
 
 urlpatterns = [
     ############# Nuevas rutas ######################
-    path('images', listImages.as_view(), name="list_images"),
 
-    path('create', createModule.as_view(), name="create_module"),
-    path('check', checkPermissionsAPI, name="check_permissions"),
-    path('stop/<str:pk>', stopContainer.as_view(), name="stop_container"),
-    path('start/<str:pk>', startContainer.as_view(), name="stop_container"),
-    path('delete/<str:pk>', deleteContainer.as_view(), name="delete_container"),
 
-    path('run/<str:pk>/examples', listExamplesModule.as_view(), name="list_examples"),
-    path('run/<str:pk>', createExperiment.as_view(), name="run_container"),
-    path('experiment', listExperiments.as_view(), name="list_experiments"),
-    path('experiment/<int:pk>', retrieveExperiment.as_view(),
+
+
+
+    # NOTE: URLS EXPERIMENT
+    path('run/<str:pk>/examples',
+         experiment.listExamplesModule.as_view(), name="list_examples"),
+    path('run/<str:pk>', experiment.createExperiment.as_view(), name="run_container"),
+    path('experiment', experiment.listExperiments.as_view(),
+         name="list_experiments"),
+    path('experiment/<int:pk>', experiment.retrieveExperiment.as_view(),
          name="retrieve_experiment"),
-    path('upload/<str:pk>/examples', uploadExamples.as_view(),
+    path('upload/<str:pk>/examples', experiment.uploadExamples.as_view(),
          name="upload_examples_experiment"),
-    path('upload/<str:pk>', createElementData.as_view(), name="upload_element"),
-    path('upload/remove/<str:pk>', DeleteElementData.as_view(),
-         name="remove_element"),
-    path('execute/<str:pk>', executeContainer.as_view(), name="upload_experiment"),
+    path('upload/<str:pk>', experiment.createElementData.as_view(),
+         name="upload_element"),
+    path('upload/remove/<str:pk>',
+         experiment.DeleteElementData.as_view(), name="remove_element"),
 
-
-    path('<str:pk>', retrieveModule.as_view(), name="detail_module"),
-    path('', listModule.as_view(), name="list_modules"),
-
-    ############# Rutas antiguas #######################
-    url('graph/(?P<docker_id>[0-9]+)', views.graph, name="graph"),
-    url('create', views.DockerCreate.as_view(), name='create_docker'),
-    url('usr', views.create_usr, name='create_usr'),
-    url('(?P<docker_id>[0-9]+)/(?P<experiment_id>[0-9]+)',
-        views.show_experiments, name="show_experiments"),
-    url('(?P<docker_id>[0-9]+)',
-        views.DockerDetail.as_view(), name="detail_docker"),
-    # url('(?P<docker_id>[0-9]+)', views.run_process, name="run_process"),
-    # url('create/', views.create_docker, name='create_docker'),
-
-    url('', views.DockerList.as_view(), name='list_docker'),
-
-
-
-
-
-    # url('background/', views.background, name='background'),
-    url('cnn/', views.cnn, name='cnn'),
-
-
-
-
+    # NOTE: URLS MODULE
+    path('check', module.checkPermissionsAPI, name="check_permissions"),
+    path('images', module.listImages.as_view(), name="list_images"),
+    path('create', module.createModule.as_view(), name="create_module"),
+    path('stop/<str:pk>', module.stopContainer.as_view(), name="stop_container"),
+    path('start/<str:pk>', module.startContainer.as_view(), name="start_container"),
+    path('delete/<str:pk>', module.deleteContainer.as_view(),
+         name="delete_container"),
+    path('<str:pk>', module.retrieveModule.as_view(), name="detail_module"),
+    path('', module.listModule.as_view(), name="list_modules"),
 ]

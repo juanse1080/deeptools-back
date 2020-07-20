@@ -41,6 +41,14 @@ class ListModuleSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class listModuleNameUser(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = Docker
+        fields = ["user", "name", "image_name", "state"]
+
+
 class RetrieveRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = Records
@@ -52,4 +60,20 @@ class ListExperimentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Experiment
+        fields = '__all__'
+
+
+class RetrieveExperimentSerializer(serializers.ModelSerializer):
+    docker = listModuleNameUser()
+
+    class Meta:
+        model = Experiment
+        fields = '__all__'
+
+
+class ListRunningExperiment(serializers.ModelSerializer):
+    experiments = RetrieveExperimentSerializer(many=True)
+
+    class Meta:
+        model = Docker
         fields = '__all__'

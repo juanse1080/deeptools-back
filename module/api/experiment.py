@@ -1,22 +1,12 @@
-from django.db import transaction
-from django.utils.crypto import get_random_string
 from django.core.exceptions import ObjectDoesNotExist
 
-from rest_framework import generics, mixins, authentication, permissions, status
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-
-import docker as docker_env
+from rest_framework.decorators import permission_classes
 
 from module.models import *
 from module.serializers import *
 from module.utils import handle_uploaded_file
-
-import os
-import json
-import time
-import string
-import random
 
 
 class createExperiment(generics.CreateAPIView):  # NOTE Create Experiment
@@ -25,21 +15,33 @@ class createExperiment(generics.CreateAPIView):  # NOTE Create Experiment
 
     def create(self, request, *args, **kwargs):
         try:
-            print(self.kwargs['pk'])
-            docker = Docker.objects.get(
-                image_name=self.kwargs['pk'], state__in=['active', 'builded'])
+            if self.request.user.role == 'developer':
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active', 'builded'])
+
+                if not docker.user.id == self.request.user.id:
+                    return Response("Permission denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'user':
+                if self.request.user.subscriptions.filter(image_name=self.kwargs['pk'], state__in=['active', 'builded']).count() == 0:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active', 'builded'])
+
+            elif self.request.user.role == 'admin':
+                docker = Docker.objects.get(image_name=self.kwargs['pk'])
+
+            else:
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             if docker.state == 'builded':
                 if not docker.user.id == self.request.user.id:
-                    return Response("Permission denied", status=status.HTTP_403_FORBIDDEN)
+                    return Response("Permission denied", status=status.HTTP_401_UNAUTHORIZED)
 
             input = docker.elements_type.filter(kind='input').get()
             output = docker.elements_type.filter(kind='output')
 
-            if output.count() == 0:
-                output = False
-            else:
-                output = True
+            output = False if output.count() == 0 else True
 
             if int(input.len) > 0:
                 experiment, created = Experiment.objects.get_or_create(
@@ -66,6 +68,43 @@ class createExperiment(generics.CreateAPIView):  # NOTE Create Experiment
                 element_data, many=True).data
             return Response(data)
         except ObjectDoesNotExist:
+            return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class listExamplesModule(generics.ListAPIView):  # NOTE List examples
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ListExamplesModule
+
+    def list(self, request, *args, **kwargs):
+        try:
+            if self.request.user.role == 'developer':
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active'])
+                if not docker.user.id == self.request.user.id:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'user':
+                if self.request.user.subscriptions.filter(image_name=self.kwargs['pk'], state__in=['active']).count() == 0:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active'])
+
+            elif self.request.user.role == 'admin':
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active'])
+
+            else:
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+
+            experiments = docker.experiments.filter(docker=docker)
+            examples = []
+            for exp in experiments.all():
+                for element in exp.elements.filter(example=True).all():
+                    element.href = element.get_public_path()
+                    examples.append(element)
+
+            return Response(self.serializer_class(examples, many=True).data)
+        except ObjectDoesNotExist:
             return Response("Module not found",
                             status=status.HTTP_404_NOT_FOUND)
 
@@ -78,26 +117,27 @@ class uploadExamples(generics.CreateAPIView):  # NOTE Upload examples experiment
         try:
             if self.request.user.role == 'developer':
                 docker = Docker.objects.get(
-                    user=self.request.user, image_name=self.kwargs['pk'], state__in=['active'])
+                    image_name=self.kwargs['pk'], state__in=['active'])
+                if not docker.user.id == self.request.user.id:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
 
             elif self.request.user.role == 'user':
+                if self.request.user.subscriptions.filter(image_name=self.kwargs['pk'], state__in=['active']).count() == 0:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
                 docker = Docker.objects.get(
-                    subscribers=self.request.user, image_name=self.kwargs['pk'], state__in=['active'])
+                    image_name=self.kwargs['pk'], state__in=['active'])
 
             elif self.request.user.role == 'admin':
                 docker = Docker.objects.get(
                     image_name=self.kwargs['pk'], state__in=['active'])
 
             else:
-                return Response("Permissions denied", status=status.HTTP_403_FORBIDDEN)
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             input = docker.elements_type.filter(kind='input').get()
             output = docker.elements_type.filter(kind='output')
 
-            if output.count() == 0:
-                output = False
-            else:
-                output = True
+            output = False if output.count() == 0 else True
 
             experiment = None
 
@@ -111,8 +151,8 @@ class uploadExamples(generics.CreateAPIView):  # NOTE Upload examples experiment
                     ref = ElementData.objects.get(id=id)
                     element = ElementData.objects.create(
                         experiment=experiment, kind='input', element=Element.objects.get(name='input'), name=ref.name)
-                    ref.copy_input(
-                        f"{experiment.get_workdir()}/inputs/input_{element.id}")
+                    element.value = ref.copy_input(
+                        f"{experiment.get_workdir()}/inputs/input_{element.id}.{ref.name.split('.')[-1]}")
                     element.save()
             else:
                 experiments = Experiment.objects.filter(
@@ -149,7 +189,7 @@ class uploadExamples(generics.CreateAPIView):  # NOTE Upload examples experiment
                     element = ElementData.objects.create(
                         experiment=experiment, kind='input', element=Element.objects.get(name='input'), name=ref.name)
                     element.value = ref.copy_input(
-                        f"{experiment.get_workdir()}/inputs/input_{element.id}")
+                        f"{experiment.get_workdir()}/inputs/input_{element.id}.{ref.name.split('.')[-1]}")
                     element.save()
 
             return Response(True)
@@ -164,8 +204,24 @@ class createElementData(generics.CreateAPIView):  # NOTE Create element data
 
     def create(self, request, *args, **kwargs):
         try:
-            docker = Docker.objects.get(
-                image_name=self.kwargs['pk'], state__in=['active', 'builded'])
+            if self.request.user.role == 'developer':
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active', 'builded'])
+                if not docker.user.id == self.request.user.id:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'user':
+                if self.request.user.subscriptions.filter(image_name=self.kwargs['pk'], state__in=['active']).count() == 0:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active', 'builded'])
+
+            elif self.request.user.role == 'admin':
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'], state__in=['active', 'builded'])
+
+            else:
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             if docker.state == 'builded':
                 if not docker.user.id == self.request.user.id:
@@ -174,10 +230,7 @@ class createElementData(generics.CreateAPIView):  # NOTE Create element data
             input = docker.elements_type.filter(kind='input').get()
             output = docker.elements_type.filter(kind='output')
 
-            if output.count() == 0:
-                output = False
-            else:
-                output = True
+            output = False if output.count() == 0 else True
 
             experiment = None
 
@@ -231,6 +284,8 @@ class DeleteElementData(generics.DestroyAPIView):  # NOTE Delete element data
 
     def delete(self, request, *args, **kwargs):
         input = ElementData.objects.get(id=self.kwargs['pk'])
+        if not input.experiment.user.id == self.request.user.id:
+            return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
         input.delete()
 
         experiment = input.experiment
@@ -245,8 +300,21 @@ class listExperiments(generics.ListAPIView):  # NOTE List experiments
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CreateExperimentSerializer
 
-    def get_queryset(self):
-        return Experiment.objects.filter(state='executing')
+    def list(self, request, *args, **kwargs):
+        if self.request.user.role == 'developer':
+            experiment = Experiment.objects.filter(
+                state="executing", user=self.request.user)
+
+        elif self.request.user.role == 'user':
+            experiment = Experiment.objects.filter(
+                state="executing", user=self.request.user)
+
+        elif self.request.user.role == 'admin':
+            experiment = Experiment.objects.filter(state="executing")
+
+        else:
+            return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.serializer_class(experiment, many=True).data)
 
 
 class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
@@ -255,8 +323,22 @@ class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            experiment = Experiment.objects.get(
-                id=self.kwargs['pk'], user=self.request.user)
+            if self.request.user.role == 'developer':
+                experiment = Experiment.objects.get(id=self.kwargs['pk'])
+                if not experiment.user.id == self.request.user.id:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'user':
+                experiment = Experiment.objects.get(id=self.kwargs['pk'])
+                if not experiment.user.id == self.request.user.id:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'admin':
+                experiment = Experiment.objects.get(id=self.kwargs['pk'])
+
+            else:
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+
             data = dict(self.serializer_class(experiment).data)
             data["elements"] = {}
             data["docker"] = ListModuleSerializer(experiment.docker).data
@@ -271,9 +353,6 @@ class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
                     data["elements"][element.kind] = [
                         element.get_public_path() if element.get_public_path() else element.value]
 
-            return Response(
-                data
-            )
+            return Response(data)
         except ObjectDoesNotExist:
-            return Response("Module not found",
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
