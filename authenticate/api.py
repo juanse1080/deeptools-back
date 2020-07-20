@@ -128,8 +128,10 @@ class listRunningExperiments(generics.ListAPIView):
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
             group_experiments = []
             for docker in dockers:
-                group_experiments.append(self.serializer_class(
-                    docker.experiments.filter(state='executed'), many=True).data)
+                exp = docker.experiments.filter(state='executing')
+                if exp.count() > 0:
+                    group_experiments.append(self.serializer_class(
+                        exp, many=True).data)
 
             return Response(group_experiments)
         except ObjectDoesNotExist:
