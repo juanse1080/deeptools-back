@@ -61,7 +61,7 @@ class listTests(generics.ListAPIView):
 
             data = dict()
             data["test"] = self.serializer_class(docker.experiments.filter(
-                user=self.request.user, state__in=['executing', 'executed', 'error']), many=True).data
+                user=self.request.user, state__in=['executing', 'executed', 'error']).order_by('-created_at'), many=True).data
             data["docker"] = ListModuleSerializer(docker).data
             return Response(data)
         except ObjectDoesNotExist:
@@ -118,7 +118,7 @@ class listRunningExperiments(generics.ListAPIView):
         try:
             if self.request.user.role == 'developer':
                 dockers = self.request.user.owner.filter(
-                    state='active')
+                    state__in=['active', 'builded'])
             elif self.request.user.role == 'user':
                 dockers = self.request.user.subscriptions.filter(
                     state='active')
@@ -128,7 +128,8 @@ class listRunningExperiments(generics.ListAPIView):
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
             group_experiments = []
             for docker in dockers:
-                exp = docker.experiments.filter(state='executing')
+                exp = docker.experiments.filter(
+                    user=self.request.user, state='executing').order_by('-created_at')
                 if exp.count() > 0:
                     group_experiments.append(self.serializer_class(
                         exp, many=True).data)
@@ -136,3 +137,20 @@ class listRunningExperiments(generics.ListAPIView):
             return Response(group_experiments)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class UpdateNotification(generics.UpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RetrieveExperimentSerializer
+
+    def update(self, request, *args, **kwargs):
+        try:
+            notification = Notification.objects.get(id=self.kwargs['pk'])
+            if not notification.owner.id == self.request.user.id:
+                return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            notification.is_active = False
+            notification.save()
+            return Response(True)
+        except ObjectDoesNotExist:
+            return Response("Notification not found", status=status.HTTP_404_NOT_FOUND)

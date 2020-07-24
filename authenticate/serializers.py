@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
+from .models import User, Notification
 from module.models import *
 
 
@@ -29,6 +29,7 @@ class MyTokenObtainPairSerializer(TokenObtainSerializer):
         data['user']['first_name'] = user['first_name']
         data['user']['last_name'] = user['last_name']
         data['user']['role'] = user['role']
+        data['user']['id'] = user['id']
 
         return data
 
@@ -38,6 +39,12 @@ class ListModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Docker
+        fields = '__all__'
+
+
+class NotificationsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
         fields = '__all__'
 
 

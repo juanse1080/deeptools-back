@@ -2,7 +2,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer, AsyncJsonWebsocke
 from channels.db import database_sync_to_async
 from asgiref.sync import async_to_sync
 from .models import *
-from .serializers import RecordsSerializer
+from authenticate.models import Notification
+from authenticate.serializers import NotificationsSerializer
 import asyncio
 import json
 
@@ -77,7 +78,7 @@ class BuildConsumer(WebsocketConsumer):
 
     def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["pk"]
-        self.room_group_name = 'chat_%s' % self.room_name
+        self.room_group_name = f"{self.room_name}_building"
 
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
@@ -180,7 +181,9 @@ class ExperimentConsumer(WebsocketConsumer):
                     'state': 'execute'
                 }
                 data = return_
-                Records.objects.create(**content, experiment=experiment)
+                record = Records.objects.create(
+                    **content, experiment=experiment)
+                record.write()
                 self.progress_group([content])
 
             print(data.elements)
@@ -191,7 +194,8 @@ class ExperimentConsumer(WebsocketConsumer):
                 'description': data.state.description,
                 'state': 'success'
             }
-            Records.objects.create(**content, experiment=experiment)
+            record = Records.objects.create(**content, experiment=experiment)
+            record.write()
             experiment.state = 'executed'
             experiment.save()
 
@@ -200,9 +204,23 @@ class ExperimentConsumer(WebsocketConsumer):
                 experiment.docker.save()
 
             self.progress_group([content])
+
+            notification_data = {
+                'title': "Your test has ended",
+                'link': f"/module/experiment/{experiment.id}",
+                'kind': "success",
+                'description': f"The test of the {experiment.docker.name} algorithm has finished successfully, select this option for more details",
+                'owner': experiment.user
+            }
+
+            print(notification_data)
+
+            notification = Notification.objects.create(**notification_data)
+            notification.send_notification()
+
         except grpc.RpcError as e:
             content = {
-                'progress': experiment.records.last().progress,
+                'progress': experiment.records.all()[-1].progress,
                 'description': "An error occurred in the server, our team will contact you when it is solved",
                 'state': 'error'
             }
@@ -220,8 +238,8 @@ class ExperimentConsumer(WebsocketConsumer):
 
     def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["pk"]
-        self.user_name = self.scope["user"].id
-        self.room_group_name = f"{self.room_name}_{self.user_name}"
+        self.user_name = self.scope["url_route"]["kwargs"]["user"]
+        self.room_group_name = f"{self.room_name}_{self.user_name}_experiments"
 
         experiment = Experiment.objects.get(id=self.room_name)
         content = [{'progress': i.progress, 'description': i.description,
@@ -251,6 +269,44 @@ class ExperimentConsumer(WebsocketConsumer):
             {
                 'type': 'send_progress',
                 'message': message
+            }
+        )
+
+    def send_progress(self, event):
+        self.send(text_data=json.dumps(event["message"]))
+
+
+class NotificationsConsumer(WebsocketConsumer):
+
+    def connect(self):
+        self.user_name = self.scope["url_route"]["kwargs"]["user"]
+        self.room_group_name = f"{self.user_name}_notifications"
+
+        user = User.objects.get(id=self.user_name)
+        content = NotificationsSerializer(
+            user.notifications.filter(is_active=True).order_by('-created_at'), many=True).data
+
+        async_to_sync(self.channel_layer.group_add)(
+            self.room_group_name,
+            self.channel_name
+        )
+        self.accept()
+
+        self.send(text_data=json.dumps(
+            {'action': 'append', 'content': content}))
+
+    def disconnect(self, close_code):
+        async_to_sync(self.channel_layer.group_discard)(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    def progress_group(self, action, message):
+        async_to_sync(self.channel_layer.group_send)(
+            self.room_group_name,
+            {
+                'type': 'send_progress',
+                'message': {'action': action, 'content': message}
             }
         )
 

@@ -3,6 +3,9 @@ from .managers import UserManager
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.base_user import AbstractBaseUser
+from channels.layers import get_channel_layer
+from rest_framework import serializers
+from asgiref.sync import async_to_sync
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -97,9 +100,37 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 class Notification(models.Model):
     title = models.CharField(max_length=100)
+    link = models.CharField(max_length=250)
     kind = models.CharField(max_length=10)
     description = models.TextField(null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    owner = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notifications")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def send_notification(self):
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"{self.owner.id}_notifications",
+            {
+                'type': 'send_progress',
+                'message': {'action': 'append', 'content': [NotificationsSerializer(self).data]}
+            }
+        )
+
+    def delete_notification(self):
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"{self.owner.id}_notifications",
+            {
+                "type": "send_progress",
+                'message': {'action': 'delete', 'content': NotificationsSerializer(self).data}
+            }
+        )
+
+
+class NotificationsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'

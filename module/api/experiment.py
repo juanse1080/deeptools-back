@@ -319,7 +319,7 @@ class listExperiments(generics.ListAPIView):  # NOTE List experiments
 
 class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = CreateExperimentSerializer
+    serializer_class = RetriveExperimentSerializer
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -341,6 +341,7 @@ class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
 
             data = dict(self.serializer_class(experiment).data)
             data["elements"] = {}
+            data["file"] = experiment.get_public_logs()
             data["docker"] = ListModuleSerializer(experiment.docker).data
             data["experiments"] = [str(i.id) for i in experiment.docker.experiments.filter(
                 user=self.request.user, state__in=['executed', 'executing', 'error']).all()]

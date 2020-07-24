@@ -12,4 +12,6 @@
         "--line-length=90"
     ],
     "editor.formatOnSave": true,
+    "python.linting.enabled": true,
+    "python.linting.banditEnabled": false,
 }

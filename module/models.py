@@ -61,7 +61,7 @@ class Docker(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=250, unique=True)
     description = models.TextField(null=True)
     image = models.CharField(max_length=100, null=True)
     workdir = models.CharField(max_length=500, null=True)
@@ -322,8 +322,15 @@ class Experiment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def get_logs(self):
+        return f"{self.get_workdir()}/logs.txt"
+
+    def get_public_logs(self):
+        return f"{self.get_public_path()}/logs.txt"
+
     def create_workdir(self, outputs=False):
         os.makedirs(self.inputs(), 0o777)
+        open(self.get_logs(), "x")
         if outputs:
             os.makedirs(self.outputs(), 0o777)
 
@@ -441,3 +448,7 @@ class Records(models.Model):
     description = models.CharField(max_length=200)
     progress = models.CharField(max_length=30)
     state = models.CharField(max_length=20, default='execute')
+
+    def write(self):
+        with open(self.experiment.get_logs(), "a") as file:
+            file.write(f"{self.description}\n")

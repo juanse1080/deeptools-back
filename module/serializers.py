@@ -26,7 +26,7 @@ class RecordsSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = '__all__'
+        fields = ["id", "first_name", "last_name"]
 
 
 class CheckBuildSerializer(serializers.Serializer):
@@ -77,8 +77,15 @@ class CreateExperimentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ListRecordsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Records
+        fields = '__all__'
+
+
 class RetriveExperimentSerializer(serializers.ModelSerializer):
     docker = RetrieveModuleSerializer()
+    records = ListRecordsSerializer(many=True)
 
     class Meta:
         model = Experiment
