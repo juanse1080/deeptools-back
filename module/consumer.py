@@ -114,12 +114,12 @@ def obj_to_data(experiment, elements):
     outputs = experiment.docker.elements_type.filter(kind='output')
     path = '{0}/media/user_{1}/exp_{2}/outputs/'.format(
         experiment.docker.workdir, experiment.user.id, experiment.id)
-    print(path)
+    print(elements.outputs)
     if outputs.count() == 1:
         if int(outputs.get().len) > 0:
-            for output in elements.outputs:
+            for output in elements.outputs.outputs:
                 element = ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
-                    name='output'), name=output.outputs.value.split(path)[1])
+                    name='output'), name=output.value.split(path)[1])
                 element.rename_output()
         else:
             element = ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
@@ -132,20 +132,41 @@ def obj_to_data(experiment, elements):
     # graphs elements
     graphs = experiment.docker.elements_type.filter(kind='graph')
     if graphs.count() == 1:
-        if int(graphs.get().len) > 0:
-            ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
-                name='output'), value=json.dumps([[point.points.x, point.points.y] for serie in elements.graphs.graphs for point in serie.series]))
+        graph = graphs.get()
+        structure = json.loads(graph.value)
+        if int(graph.len) > 0:
+            for index, serie in enumerate(elements.graphs.graphs.series):
+                points = []
+                for point in serie.points:
+                    points.append([point.x, float(point.y)])
+                structure["series"][index]["data"] = points
+
+            ElementData.objects.create(experiment=experiment, kind='graph', element=Element.objects.get(
+                name='graph'), value=json.dumps(structure))
         else:
-            ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
-                name='output'), value=json.dumps([[serie.points.x, serie.points.y] for serie in elements.graphs.graphs.series]))
+            structure["series"][0]["data"] = [[point.x, float(point.y)]
+                                              for point in elements.graphs.graphs.series.points]
+            ElementData.objects.create(experiment=experiment, kind='graph', element=Element.objects.get(
+                name='graph'), value=json.dumps(structure))
+
     elif graphs.count() > 1:
-        for index, graph in enumerate(elements.graphs):
-            if int(graphs[index].len) > 0:
-                ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
-                    name='output'), value=json.dumps([[point.points.x, point.points.y] for serie in graph.graphs for point in serie.series]))
+        for index, graph in enumerate(elements.graphs.graphs):
+            current_graph = graphs[index]
+            structure = json.loads(current_graph.value)
+            if int(current_graph.len) > 0:
+                for index, serie in enumerate(graph.series):
+                    points = []
+                    for point in serie.points:
+                        points.append([point.x, float(point.y)])
+                    structure["series"][index]["data"] = points
+
+                ElementData.objects.create(experiment=experiment, kind='graph', element=Element.objects.get(
+                    name='graph'), value=json.dumps(structure))
             else:
-                ElementData.objects.create(experiment=experiment, kind='output', element=Element.objects.get(
-                    name='output'), value=json.dumps([[serie.points.x, serie.points.y] for serie in graph.graphs.series]))
+                structure["series"][0]["data"] = [[point.x, float(point.y)]
+                                                  for point in graph.series.points]
+                ElementData.objects.create(experiment=experiment, kind='graph', element=Element.objects.get(
+                    name='graph'), value=json.dumps(structure))
 
 
 class ExperimentConsumer(WebsocketConsumer):
@@ -219,15 +240,31 @@ class ExperimentConsumer(WebsocketConsumer):
             notification.send_notification()
 
         except grpc.RpcError as e:
+            pro = experiment.records.all(
+            )[-1].progress if experiment.records.count() > 0 else 0
             content = {
-                'progress': experiment.records.all()[-1].progress,
+                'progress': pro,
                 'description': "An error occurred in the server, our team will contact you when it is solved",
                 'state': 'error'
             }
             experiment.state = "error"
             experiment.save()
+
             Records.objects.create(**content, experiment=experiment)
             self.progress_group([content])
+
+            notification_data = {
+                'title': "There was an error during the execution of your algorithm",
+                'link': f"/module/{experiment.docker.id}",
+                'kind': "error",
+                'description': f"The {experiment.docker.name} algorithm had an error during its execution, go to it and check the activity log to solve this problem",
+                'owner': experiment.docker.user
+            }
+
+            print(notification_data)
+
+            notification = Notification.objects.create(**notification_data)
+            notification.send_notification()
 
             print('###### CreateUser failed with {0}: {1}'.format(
                 e.code(), e.details()), e, dir(e))
@@ -285,6 +322,7 @@ class NotificationsConsumer(WebsocketConsumer):
         user = User.objects.get(id=self.user_name)
         content = NotificationsSerializer(
             user.notifications.filter(is_active=True).order_by('-created_at'), many=True).data
+        print(content)
 
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
@@ -293,7 +331,7 @@ class NotificationsConsumer(WebsocketConsumer):
         self.accept()
 
         self.send(text_data=json.dumps(
-            {'action': 'append', 'content': content}))
+            {'action': 'fetch', 'content': content}))
 
     def disconnect(self, close_code):
         async_to_sync(self.channel_layer.group_discard)(

@@ -41,6 +41,7 @@ class ElementTypeSerializer(serializers.ModelSerializer):
 
 class ListModuleSerializer(serializers.ModelSerializer):
     user = UserSerializer()
+    elements_type = ElementTypeSerializer(many=True)
 
     class Meta:
         model = Docker
@@ -48,11 +49,13 @@ class ListModuleSerializer(serializers.ModelSerializer):
 
 
 class RetrieveModuleSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
     elements_type = ElementTypeSerializer(many=True)
 
     class Meta:
         model = Docker
-        fields = '__all__'
+        fields = ["elements_type", "image_name", "subscribers", "classname", "created_at", "description",
+                  "extensions", "user", "file", "image", "name", "protocol", "state", "view", "workdir"]
 
 
 class RetrieveElementDataSerializer(serializers.ModelSerializer):
@@ -109,6 +112,7 @@ class CreateModuleSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         temp = validated_data.copy()
+        print(temp)
         del temp["elements"]
         with transaction.atomic():
             docker = Docker.objects.create(**temp)
@@ -125,4 +129,4 @@ class CreateModuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Docker
         fields = ['id', 'image_name', 'proto', 'user', 'protocol',
-                  'name', 'description', 'image', 'workdir', 'file', 'classname', 'elements']
+                  'name', 'description', 'image', 'workdir', 'file', 'classname', 'elements', 'view', 'extensions']

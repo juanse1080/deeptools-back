@@ -67,6 +67,8 @@ class Docker(models.Model):
     workdir = models.CharField(max_length=500, null=True)
     file = models.CharField(max_length=100, null=True)
     classname = models.CharField(max_length=100, null=True)
+    view = models.CharField(max_length=1, blank=False)
+    extensions = models.CharField(max_length=250, null=True, blank=False)
 
     def get_container(self):
         try:
@@ -282,9 +284,7 @@ class Docker(models.Model):
             print(error)
 
     def delete_module(self):
-        if self.state == 'active':
-            self.stop_container()
-
+        self.stop_container()
         self.delete_image()
         self.state = 'deleted'
         self.save()
@@ -368,23 +368,24 @@ class Experiment(models.Model):
             outputs = self.docker.elements_type.filter(kind='output')
             have_output = outputs.count() == 1
 
-            print(inputs_data)
-
-            if outputs.count() == 1:
+            if have_output:
                 outputs_data = '{0}/media/user_{1}/exp_{2}/outputs'.format(
                     self.docker.workdir, self.user.id, self.id)
 
             def get_inputs_obj(values, len):
                 if len > 0:
-                    return (objects.Inputs(inputs=objects.Input(value=value)) for value in values)
+                    return objects.Inputs(inputs=(objects.Input(value=value) for value in values))
                 else:
                     return objects.Inputs(inputs=objects.Input(value=values))
 
             def createIn(inputs, outputs, len, have_output=False):
+                # print(inputs, outputs, len, have_output)
                 if have_output:
                     return {'inputs': get_inputs_obj(inputs, len), 'output': objects.Output(value=outputs)}
                 else:
                     return {'inputs': get_inputs_obj(inputs, len)}
+
+            print(createIn(inputs_data, outputs_data, int(input.len), have_output))
 
             return objects.In(
                 **createIn(inputs_data, outputs_data, int(input.len), have_output)

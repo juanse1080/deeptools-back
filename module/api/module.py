@@ -33,12 +33,13 @@ class createModule(generics.CreateAPIView):  # NOTE Create module
 
         # Cargando los datos
         data = dict(request.data)
+        print(data)
 
         # verificando la existencia de los datos en el contanedor
         client = docker_env.from_env()
         try:
             exist_workdir = client.containers.run(
-                image=data["image"], command="test -d {0}".format(data["workdir"]))
+                remove=True, image=data["image"], command="test -d {0}".format(data["workdir"]))
         except docker_env.errors.ContainerError as error:
             return Response({
                 "workdir": ["Path to workdir not found in image {}".format(data["image"])]}, status=status.HTTP_409_CONFLICT)
@@ -47,7 +48,7 @@ class createModule(generics.CreateAPIView):  # NOTE Create module
 
         try:
             exist_file = client.containers.run(
-                image=data["image"], command="ls -d {0}/{1}".format(data["workdir"], data["file"]))
+                remove=True, image=data["image"], command="ls -d {0}/{1}".format(data["workdir"], data["file"]))
         except docker_env.errors.ContainerError as error:
             return Response({
                 "file": ["This file not exist in your {0}".format(data["workdir"])]}, status=status.HTTP_409_CONFLICT)
@@ -56,9 +57,17 @@ class createModule(generics.CreateAPIView):  # NOTE Create module
 
         try:
             exist_classname = client.containers.run(
-                image=data["image"], command="grep 'class {0}' {1}/{2}".format(data["classname"], data["workdir"], data["file"]))
+                remove=True, image=data["image"], command="grep 'class {0}' {1}/{2}".format(data["classname"], data["workdir"], data["file"]))
         except docker_env.errors.ContainerError as error:
             return Response({"classname": ["Class not exist in {0}/{1}".format(data["workdir"], data["file"])]}, status=status.HTTP_409_CONFLICT)
+        except docker_env.errors.ImageNotFound as error:
+            return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)
+
+        try:
+            exist_classname = client.containers.run(
+                remove=True, image=data["image"], working_dir=data["workdir"], command="python {0}".format(data["file"]))
+        except docker_env.errors.ContainerError as error:
+            return Response({"classname": ["{0} class has trouble running, verify document can run".format(data["classname"])]}, status=status.HTTP_409_CONFLICT)
         except docker_env.errors.ImageNotFound as error:
             return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)
 
@@ -70,6 +79,7 @@ class createModule(generics.CreateAPIView):  # NOTE Create module
 
         # Serializando el objeto
         serializer = self.serializer_class(data=data)
+        print(serializer)
         if serializer.is_valid():
             docker = serializer.save()
             docker.create_docker()
@@ -132,8 +142,6 @@ class retrieveModule(generics.RetrieveAPIView):  # NOTE Show module
                     return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
 
             elif self.request.user.role == 'user':
-                if self.request.user.subscriptions.filter(image_name=self.kwargs['pk']).count() == 0:
-                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
                 docker = Docker.objects.get(image_name=self.kwargs['pk'])
 
             elif self.request.user.role == 'admin':
@@ -142,14 +150,14 @@ class retrieveModule(generics.RetrieveAPIView):  # NOTE Show module
             else:
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
-            return Response(self.serializer_class(docker).data)
+            data = self.serializer_class(docker).data
+            return Response(data)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
 
 
 class deleteContainer(generics.DestroyAPIView):  # NOTE Delete module
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = RetrieveModuleSerializer
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -170,14 +178,13 @@ class deleteContainer(generics.DestroyAPIView):  # NOTE Delete module
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             docker.delete_module()
-            return Response(self.serializer_class(docker).data)
+            return Response(True)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
 
 
 class stopContainer(generics.UpdateAPIView):  # NOTE Stop container
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = RetrieveModuleSerializer
 
     def update(self, request, *args, **kwargs):
         try:
@@ -198,7 +205,7 @@ class stopContainer(generics.UpdateAPIView):  # NOTE Stop container
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             docker.stop_container()
-            return Response(self.serializer_class(docker).data)
+            return Response(True)
         except ObjectDoesNotExist:
             return Response("Module not found",
                             status=status.HTTP_404_NOT_FOUND)
@@ -206,7 +213,6 @@ class stopContainer(generics.UpdateAPIView):  # NOTE Stop container
 
 class startContainer(generics.UpdateAPIView):  # NOTE Start container
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = RetrieveModuleSerializer
 
     def update(self, request, *args, **kwargs):
         try:
@@ -227,7 +233,7 @@ class startContainer(generics.UpdateAPIView):  # NOTE Start container
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             docker.run_container()
-            return Response(self.serializer_class(docker).data)
+            return Response(True)
         except ObjectDoesNotExist:
             return Response("Module not found",
                             status=status.HTTP_404_NOT_FOUND)

@@ -2,16 +2,19 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import generics, mixins, authentication, permissions, status
 from rest_framework.response import Response
-from .serializers import *
+from module.models import Docker, Experiment, ElementData, Element
+from .models import Notification
+from .serializers import MyTokenObtainPairSerializer, ListModuleSerializer, ListExperimentSerializer, RetrieveExperimentSerializer
+from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, ListActiveModules
 
 
-class LoginAPI(TokenObtainPairView):
+class LoginAPI(TokenObtainPairView):  # NOTE Login
     serializer_class = MyTokenObtainPairSerializer
 
 
-class listSubscriptions(generics.ListAPIView):
+class listSubscriptions(generics.ListAPIView):  # NOTE list module
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ListModuleSerializer
+    serializer_class = listSubscriptionSerializer
 
     def list(self, request, *args, **kwargs):
         others = self.request.user.subscriptions.filter(
@@ -25,24 +28,8 @@ class listSubscriptions(generics.ListAPIView):
         return Response(self.serializer_class(actives.union(others).order_by('created_at'), many=True).data)
 
 
-class deleteExperiments(generics.DestroyAPIView):
+class listTests(generics.ListAPIView):  # NOTE list experiments
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ListExperimentSerializer
-
-    def delete(self, request, *args, **kwargs):
-        try:
-            experiment = Experiment.objects.get(id=self.kwargs['pk'])
-            if not experiment.user.id == self.request.user.id:
-                return Response("Permissions denied", status=status.HTTP_403_FORBIDDEN)
-            experiment.delete()
-            return Response(True)
-        except ObjectDoesNotExist:
-            return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
-
-
-class listTests(generics.ListAPIView):
-    permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ListExperimentSerializer
 
     def list(self, request, *args, **kwargs):
         try:
@@ -60,17 +47,30 @@ class listTests(generics.ListAPIView):
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             data = dict()
-            data["test"] = self.serializer_class(docker.experiments.filter(
-                user=self.request.user, state__in=['executing', 'executed', 'error']).order_by('-created_at'), many=True).data
+            data["test"] = listTestSerializer(docker.experiments.filter(
+                user=self.request.user, state__in=['executing', 'executed', 'error']).order_by('-updated_at'), many=True).data
             data["docker"] = ListModuleSerializer(docker).data
             return Response(data)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
 
 
+class deleteExperiments(generics.DestroyAPIView):  # NOTE Delete experiment
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, *args, **kwargs):
+        try:
+            experiment = Experiment.objects.get(id=self.kwargs['pk'])
+            if not experiment.user.id == self.request.user.id:
+                return Response("Permissions denied", status=status.HTTP_403_FORBIDDEN)
+            experiment.delete()
+            return Response(True)
+        except ObjectDoesNotExist:
+            return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
+
+
 class cloneExperiment(generics.CreateAPIView):  # NOTE Clone experiment
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ListExperimentSerializer
 
     def create(self, request, *args, **kwargs):
         try:
@@ -110,9 +110,9 @@ class cloneExperiment(generics.CreateAPIView):  # NOTE Clone experiment
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
 
 
-class listRunningExperiments(generics.ListAPIView):
+class listRunningExperiments(generics.ListAPIView):  # NOTE list running
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = RetrieveExperimentSerializer
+    serializer_class = listRunningSerializer
 
     def list(self, request, *args, **kwargs):
         try:
@@ -141,7 +141,6 @@ class listRunningExperiments(generics.ListAPIView):
 
 class UpdateNotification(generics.UpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = RetrieveExperimentSerializer
 
     def update(self, request, *args, **kwargs):
         try:
@@ -151,6 +150,20 @@ class UpdateNotification(generics.UpdateAPIView):
 
             notification.is_active = False
             notification.save()
+
             return Response(True)
         except ObjectDoesNotExist:
             return Response("Notification not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class listModules(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ListActiveModules
+
+    def list(self, request, *args, **kwargs):
+        modules = Docker.objects.filter(state='active')
+        for module in modules:
+            module.image = module.subscribers.count()
+        data = self.serializer_class(modules, many=True).data
+        print(data[0])
+        return Response(data)

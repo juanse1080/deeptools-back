@@ -42,16 +42,17 @@ class ServerElement(Element):
     def graph(self):
         content = 'def generate_serie(points):\n\treturn objects.Serie(points=(objects.Point(x=str(point[0]), y=str(point[1])) for point in points))\n\n'
 
-        content += 'def generate_graph(graphs):\n\treturn objects.Graph(\n'
+        content += 'def generate_graph(series):\n\treturn objects.Graph(\n'
         if self.many_series:
-            content += '\t\tseries=(generate_serie(graph) for graph in graphs))\n\n'
+            content += '\t\tseries=(generate_serie(serie) for serie in series))\n\n'
         else:
-            content += '\t\tseries=generate_serie(graphs))\n\n'
-        content += 'def generate_graph(graphs):\n\treturn objects.Graph(\n'
+            content += '\t\tseries=generate_serie(series))\n\n'
+
+        content += 'def generate_graphs(graphs):\n\treturn objects.Graphs(\n'
         if self.many_graph:
-            content += '\t\tseries=(generate_serie(graph) for graph in graphs))\n\n'
+            content += '\t\tgraphs=(generate_graph(graph) for graph in graphs))\n\n'
         else:
-            content += '\t\tseries=generate_serie(graphs))\n\n'
+            content += '\t\tgraphs=generate_graph(graphs))\n\n'
         self.content = content
 
 
