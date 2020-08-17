@@ -261,7 +261,7 @@ class createElementData(generics.CreateAPIView):  # NOTE Create element data
 
             file = request.FILES['file']
 
-            if docker.state == 'builded':
+            if docker.user.id == self.request.user.id:
                 element = ElementData.objects.create(
                     experiment=experiment, kind='input', element=Element.objects.get(name='input'), name=file.name, example=True)
             else:
@@ -323,21 +323,18 @@ class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            if self.request.user.role == 'developer':
-                experiment = Experiment.objects.get(id=self.kwargs['pk'])
-                if not experiment.user.id == self.request.user.id:
-                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+            experiment = Experiment.objects.get(id=self.kwargs['pk'])
+            if experiment.elements.filter(example=True, kind='input').count() == 0:
+                if self.request.user.role == 'developer':
+                    if not experiment.user.id == self.request.user.id:
+                        return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
 
-            elif self.request.user.role == 'user':
-                experiment = Experiment.objects.get(id=self.kwargs['pk'])
-                if not experiment.user.id == self.request.user.id:
-                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+                elif self.request.user.role == 'user':
+                    if not experiment.user.id == self.request.user.id:
+                        return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
 
-            elif self.request.user.role == 'admin':
-                experiment = Experiment.objects.get(id=self.kwargs['pk'])
-
-            else:
-                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
             data = dict(self.serializer_class(experiment).data)
             data["elements"] = {}
@@ -345,6 +342,8 @@ class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
             data["docker"] = ListModuleSerializer(experiment.docker).data
             data["experiments"] = [str(i.id) for i in experiment.docker.experiments.filter(
                 user=self.request.user, state__in=['executed', 'executing', 'error']).all()]
+            print(experiment.user.id == self.request.user.id)
+            data["owner"] = experiment.user.id == self.request.user.id
 
             for element in experiment.elements.all():
                 if element.kind in data["elements"]:

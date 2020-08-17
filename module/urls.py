@@ -34,6 +34,8 @@ urlpatterns = [
     path('start/<str:pk>', module.startContainer.as_view(), name="start_container"),
     path('delete/<str:pk>', module.deleteContainer.as_view(),
          name="delete_container"),
+    path('subscribers/<str:pk>', module.subscribeContainer.as_view(),
+         name="subscribers_container"),
     path('<str:pk>', module.retrieveModule.as_view(), name="detail_module"),
     path('', module.listModule.as_view(), name="list_modules"),
 ]

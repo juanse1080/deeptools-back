@@ -11,6 +11,7 @@ from module.serializers import *
 
 import string
 import random
+import json
 
 
 @api_view(['POST'])  # NOTE Check permissions
@@ -31,11 +32,12 @@ class createModule(generics.CreateAPIView):  # NOTE Create module
         if not self.request.user.has_perm('module.add_docker'):
             return Response("Permission denied", status=status.HTTP_401_UNAUTHORIZED)
 
-        # Cargando los datos
-        data = dict(request.data)
-        print(data)
+        data = {}
+        for key, value in request.data.items():
+            data[key] = value
 
-        # verificando la existencia de los datos en el contanedor
+        data["elements"] = json.loads(data["elements"])
+
         client = docker_env.from_env()
         try:
             exist_workdir = client.containers.run(
@@ -79,11 +81,11 @@ class createModule(generics.CreateAPIView):  # NOTE Create module
 
         # Serializando el objeto
         serializer = self.serializer_class(data=data)
-        print(serializer)
         if serializer.is_valid():
             docker = serializer.save()
             docker.create_docker()
             return Response(docker.image_name)
+        print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
 
 
@@ -150,7 +152,14 @@ class retrieveModule(generics.RetrieveAPIView):  # NOTE Show module
             else:
                 return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
+            docker.background = f"{docker.get_public_path()}/{docker.background}"
             data = self.serializer_class(docker).data
+            exps = []
+            for exp in docker.experiments.filter(elements__example=True, user=docker.user, state='executed').distinct():
+                exp.state = exp.elements.filter(
+                    kind='input')[0].get_public_path()
+                exps.append(exp)
+            data["experiments"] = RetriveExperiment(exps, many=True).data
             return Response(data)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
@@ -181,6 +190,38 @@ class deleteContainer(generics.DestroyAPIView):  # NOTE Delete module
             return Response(True)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class subscribeContainer(generics.UpdateAPIView):  # NOTE subscribe container
+    permission_classes = [permissions.IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        try:
+            if self.request.user.role == 'user':
+                docker = Docker.objects.get(
+                    image_name=self.kwargs['pk'])
+
+            elif self.request.user.role == 'developer':
+                return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'admin':
+                return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            else:
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+
+            if not docker.check_if_exist(self.request.user):
+                docker.subscribers.add(self.request.user)
+                docker.save()
+                return Response('add')
+            else:
+                docker.subscribers.remove(self.request.user)
+                docker.save()
+                return Response('remove')
+
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
 
 
 class stopContainer(generics.UpdateAPIView):  # NOTE Stop container

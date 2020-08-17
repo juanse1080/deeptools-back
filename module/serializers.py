@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import *
 from authenticate.models import User
 from django.db import transaction
+from module.utils import handle_uploaded_file
 
 
 class ImageSerializer(serializers.Serializer):
@@ -55,7 +56,13 @@ class RetrieveModuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Docker
         fields = ["elements_type", "image_name", "subscribers", "classname", "created_at", "description",
-                  "extensions", "user", "file", "image", "name", "protocol", "state", "view", "workdir"]
+                  "extensions", "user", "file", "image", "name", "protocol", "state", "view", "workdir", "background"]
+
+
+class RetriveExperiment(serializers.ModelSerializer):
+    class Meta:
+        model = Experiment
+        fields = ["id", "state"]
 
 
 class RetrieveElementDataSerializer(serializers.ModelSerializer):
@@ -109,13 +116,17 @@ class ListExperimentIdSerializer(serializers.ModelSerializer):
 
 class CreateModuleSerializer(serializers.ModelSerializer):
     elements = CreateElementsType(many=True)
+    background = serializers.ImageField()
 
     def create(self, validated_data):
         temp = validated_data.copy()
-        print(temp)
+        print("######3", temp)
         del temp["elements"]
         with transaction.atomic():
-            docker = Docker.objects.create(**temp)
+            docker = Docker(**temp)
+            docker.background = handle_uploaded_file(
+                temp["background"], docker.get_path(), f"img_{docker.id}")
+            docker.save()
             for element in validated_data["elements"]:
                 ElementType.objects.create(
                     kind=element['kind'],
@@ -129,4 +140,4 @@ class CreateModuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Docker
         fields = ['id', 'image_name', 'proto', 'user', 'protocol',
-                  'name', 'description', 'image', 'workdir', 'file', 'classname', 'elements', 'view', 'extensions']
+                  'name', 'description', 'image', 'workdir', 'file', 'classname', 'elements', 'view', 'extensions', 'background']

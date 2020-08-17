@@ -62,6 +62,7 @@ class Docker(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     name = models.CharField(max_length=250, unique=True)
+    background = models.CharField(max_length=500)
     description = models.TextField(null=True)
     image = models.CharField(max_length=100, null=True)
     workdir = models.CharField(max_length=500, null=True)
@@ -69,6 +70,9 @@ class Docker(models.Model):
     classname = models.CharField(max_length=100, null=True)
     view = models.CharField(max_length=1, blank=False)
     extensions = models.CharField(max_length=250, null=True, blank=False)
+
+    def check_if_exist(self, sub):
+        return sub in self.subscribers.all()
 
     def get_container(self):
         try:

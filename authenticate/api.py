@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from module.models import Docker, Experiment, ElementData, Element
 from .models import Notification
 from .serializers import MyTokenObtainPairSerializer, ListModuleSerializer, ListExperimentSerializer, RetrieveExperimentSerializer
-from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, ListActiveModules
+from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, ListActiveModules, NotificationsSerializer
 
 
 class LoginAPI(TokenObtainPairView):  # NOTE Login
@@ -103,6 +103,8 @@ class cloneExperiment(generics.CreateAPIView):  # NOTE Clone experiment
                     experiment=new_experiment, kind='input', element=Element.objects.get(name='input'), name=data.name)
                 element.value = data.copy_input(
                     f"{new_experiment.get_workdir()}/inputs/input_{element.id}.{data.name.split('.')[-1]}")
+                if experiment.user.id == self.request.user.id:
+                    element.example = True
                 element.save()
 
             return Response(True)
@@ -162,8 +164,21 @@ class listModules(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         modules = Docker.objects.filter(state='active')
-        for module in modules:
+        subscriptions = self.request.user.subscriptions.exclude(
+            state='deleted')
+        all = (subscriptions | modules).distinct()
+        for module in all:
             module.image = module.subscribers.count()
-        data = self.serializer_class(modules, many=True).data
-        print(data[0])
+            module.background = f"{module.get_public_path()}/{module.background}"
+        data = self.serializer_class(all, many=True).data
+        # print(data[0])
         return Response(data)
+
+
+class listNotifications(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NotificationsSerializer
+
+    def list(self, request, *args, **kwargs):
+        notifications = self.request.user.notifications.all().order_by('-created_at')
+        return Response(self.serializer_class(notifications, many=True).data)

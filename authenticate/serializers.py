@@ -88,7 +88,7 @@ class ListActiveModules(serializers.ModelSerializer):
     class Meta:
         model = Docker
         fields = ["image_name", "state", "user",
-                  "created_at", "name", "description", "image", "subscribers"]
+                  "created_at", "name", "description", "image", "subscribers", "background"]
 
 
 class ListExperimentSerializer(serializers.ModelSerializer):

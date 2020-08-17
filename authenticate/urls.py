@@ -20,4 +20,5 @@ urlpatterns = [
     path('running', listRunningExperiments.as_view(), name='running'),
     path('notifications/<int:pk>', UpdateNotification.as_view(),
          name='show_notification'),
+    path('notifications/', listNotifications.as_view(), name='notifications'),
 ]
