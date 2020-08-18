@@ -21,4 +21,5 @@ urlpatterns = [
     path('notifications/<int:pk>', UpdateNotification.as_view(),
          name='show_notification'),
     path('notifications/', listNotifications.as_view(), name='notifications'),
+    path('profile/<int:pk>', profile.as_view(), name='profile'),
 ]

@@ -19,6 +19,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     birth = models.DateField(null=True)
     first_name = models.CharField(max_length=35)
     last_name = models.CharField(max_length=35)
+    photo = models.TextField(null=True, default='/media/users/3.jpg')
     email = models.CharField(max_length=60, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

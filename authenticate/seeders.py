@@ -57,6 +57,7 @@ def create_seeder():
         email='admin@gmail.com',
         password=make_password('clave'),
         role='admin',
+        photo="/media/users/3.jpg"
         is_superuser=True,
         is_staff=True,
         is_active=True,
@@ -69,6 +70,7 @@ def create_seeder():
         email='developer@gmail.com',
         password=make_password('clave'),
         role='developer',
+        photo="/media/users/2.jpg"
         is_superuser=False,
         is_staff=False,
         is_active=True,
@@ -83,6 +85,7 @@ def create_seeder():
         email='user@gmail.com',
         password=make_password('clave'),
         role='user',
+        photo="/media/users/3.jpg"
         is_superuser=False,
         is_staff=False,
         is_active=True,

@@ -8,7 +8,8 @@ from module.models import *
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "first_name", "last_name"]
+        fields = ["id", "first_name", "last_name",
+                  "photo", "role", "owner", "subscriptions"]
 
 
 class RetrieveRecordSerializer(serializers.ModelSerializer):
@@ -34,6 +35,7 @@ class MyTokenObtainPairSerializer(TokenObtainSerializer):
         data['user']['first_name'] = self.user.first_name
         data['user']['last_name'] = self.user.last_name
         data['user']['role'] = self.user.role
+        data['user']['photo'] = self.user.photo
         data['user']['id'] = self.user.id
 
         return data

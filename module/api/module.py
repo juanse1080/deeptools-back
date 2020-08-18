@@ -160,6 +160,9 @@ class retrieveModule(generics.RetrieveAPIView):  # NOTE Show module
                     kind='input')[0].get_public_path()
                 exps.append(exp)
             data["experiments"] = RetriveExperiment(exps, many=True).data
+            if self.request.user.id == docker.user.id:
+                data["users"] = UserSerializer(
+                    docker.subscribers.all(), many=True).data
             return Response(data)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)

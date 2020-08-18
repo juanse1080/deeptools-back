@@ -3,9 +3,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import generics, mixins, authentication, permissions, status
 from rest_framework.response import Response
 from module.models import Docker, Experiment, ElementData, Element
-from .models import Notification
+from .models import Notification, User
 from .serializers import MyTokenObtainPairSerializer, ListModuleSerializer, ListExperimentSerializer, RetrieveExperimentSerializer
-from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, ListActiveModules, NotificationsSerializer
+from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, ListActiveModules, NotificationsSerializer, UserSerializer
 
 
 class LoginAPI(TokenObtainPairView):  # NOTE Login
@@ -182,3 +182,47 @@ class listNotifications(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         notifications = self.request.user.notifications.all().order_by('-created_at')
         return Response(self.serializer_class(notifications, many=True).data)
+
+
+class profile(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            user = User.objects.get(id=self.kwargs['pk'])
+            if self.request.user.role == 'user' and not self.request.user.id == self.kwargs['pk'] and user.role == 'user':
+                return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+            if self.request.user.role == 'developer' and not self.request.user.id == self.kwargs['pk']:
+                _is = False
+                for docker in self.request.user.owner.exclude(state='active'):
+                    if user in docker.subscribers.all():
+                        _is = True
+                        break
+                if not _is:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            if user.role == 'developer':
+                dockers = user.owner.filter(state='active')
+            elif user.role == 'user':
+                if self.request.user.id == self.kwargs['pk']:
+                    dockers = user.subscriptions.all()
+                else:
+                    dockers = user.subscriptions.filter(
+                        user=self.request.user).exclude(state='deleted')
+            else:
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+
+            modules = []
+            for module in dockers:
+                module.image = module.subscribers.count()
+                module.background = f"{module.get_public_path()}/{module.background}"
+                modules.append(module)
+            data = self.serializer_class(user).data
+            data["algorithms"] = ListActiveModules(modules, many=True).data
+            data["subscriptions"] = user.subscriptions.count() if self.request.user.id == self.kwargs['pk'] else user.subscriptions.filter(
+                user=self.request.user).exclude(state='deleted').count()
+            data["owner"] = user.owner.filter(state='active').count()
+            return Response(data)
+        except ObjectDoesNotExist:
+            return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
