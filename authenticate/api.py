@@ -1,11 +1,13 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Count, Q
+from django.db.models.functions import Concat, Lower
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import generics, mixins, authentication, permissions, status
 from rest_framework.response import Response
 from module.models import Docker, Experiment, ElementData, Element
 from .models import Notification, User
-from .serializers import MyTokenObtainPairSerializer, ListModuleSerializer, ListExperimentSerializer, RetrieveExperimentSerializer
-from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, ListActiveModules, NotificationsSerializer, UserSerializer
+from .serializers import MyTokenObtainPairSerializer, ListModuleSerializer, ListExperimentSerializer, RetrieveExperimentSerializer, FilterDockerSerializers
+from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, listCompletedSerializer, ListActiveModules, NotificationsSerializer, UserSerializer
 
 
 class LoginAPI(TokenObtainPairView):  # NOTE Login
@@ -25,7 +27,12 @@ class listSubscriptions(generics.ListAPIView):  # NOTE list module
             if not active.check_active_state():
                 active.state = 'stopped'
                 active.save()
-        return Response(self.serializer_class(actives.union(others).order_by('created_at'), many=True).data)
+        modules = []
+        for module in actives.union(others).order_by('created_at'):
+            module.background = f"{module.get_public_path()}/{module.background}"
+            modules.append(module)
+
+        return Response(self.serializer_class(modules, many=True).data)
 
 
 class listTests(generics.ListAPIView):  # NOTE list experiments
@@ -226,3 +233,54 @@ class profile(generics.RetrieveAPIView):
             return Response(data)
         except ObjectDoesNotExist:
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class dashboard(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            data = {}
+            data["running"] = listRunningSerializer(self.request.user.experiments.filter(
+                state='executing', docker__state='active').order_by('-created_at')[0:10], many=True).data
+            data["last"] = listCompletedSerializer(self.request.user.experiments.filter(
+                state='executed').order_by('-created_at')[0:10], many=True).data
+
+            if self.request.user.role == "user":
+                modules = []
+                for module in Docker.objects.filter(state='active').exclude(subscribers=self.request.user).order_by('-created_at')[0:10]:
+                    # print(type(module))
+                    module.image = module.subscribers.count()
+                    module.background = f"{module.get_public_path()}/{module.background}"
+                    modules.append(module)
+            elif self.request.user.role == "developer":
+                modules = []
+                for module in Docker.objects.filter(user=self.request.user).order_by('-created_at')[0:10]:
+                    module.image = module.subscribers.count()
+                    module.background = f"{module.get_public_path()}/{module.background}"
+                    modules.append(module)
+            data["news"] = ListActiveModules(modules, many=True).data
+            return Response(data)
+        except ObjectDoesNotExist:
+            return Response("User not found", status=status.HTTP_404_NOT_FOUND)
+
+
+class findAll(generics.UpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        dockers = []
+        print(
+            Docker.objects.annotate(name_lower=Lower('name'), description_lower=Lower('description')).filter(
+                Q(Q(name_lower__contains=self.request.data["value"].lower()) | Q(description_lower__contains=self.request.data["value"])), state='active').query
+        )
+        for docker in Docker.objects.annotate(name_lower=Lower('name'), description_lower=Lower('description')).filter(
+                Q(Q(name_lower__contains=self.request.data["value"].lower()) | Q(description_lower__contains=self.request.data["value"])), state='active')[:10]:
+            docker.background = f"{docker.get_public_path()}/{docker.background}"
+            dockers.append(docker)
+        users = User.objects.annotate(name=Lower(Concat('first_name', 'last_name'))).filter(
+            role='developer', name__contains=self.request.data["value"].lower())
+        data = {}
+        data["dockers"] = FilterDockerSerializers(dockers, many=True).data
+        data["users"] = UserSerializer(users, many=True).data
+        return Response(data)

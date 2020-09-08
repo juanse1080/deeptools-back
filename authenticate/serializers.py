@@ -48,7 +48,7 @@ class listSubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Docker
         fields = ["image_name", "state", "user",
-                  "created_at", "name", "description"]
+                  "created_at", "name", "description", "background"]
 
 
 class listTestSerializer(serializers.ModelSerializer):  # NOTE list test
@@ -75,6 +75,28 @@ class listRunningSerializer(serializers.ModelSerializer):  # NOTE list running
         fields = '__all__'
 
 
+class listCompletedSerializer(serializers.ModelSerializer):  # NOTE list running
+
+    class docker(serializers.ModelSerializer):
+        user = UserSerializer()
+
+        class Meta:
+            model = Docker
+            fields = ["user", "name", "image_name", "state"]
+
+    class records(serializers.ModelSerializer):
+        class Meta:
+            model = Docker
+            fields = ["description"]
+
+    docker = docker()
+    records = records(many=True)
+
+    class Meta:
+        model = Experiment
+        fields = '__all__'
+
+
 class ListModuleSerializer(serializers.ModelSerializer):
     user = UserSerializer()
 
@@ -86,11 +108,12 @@ class ListModuleSerializer(serializers.ModelSerializer):
 
 class ListActiveModules(serializers.ModelSerializer):
     user = UserSerializer()
+    count = serializers.IntegerField(allow_null=True)
 
     class Meta:
         model = Docker
         fields = ["image_name", "state", "user",
-                  "created_at", "name", "description", "image", "subscribers", "background"]
+                  "created_at", "name", "description", "image", "subscribers", "background", "count"]
 
 
 class ListExperimentSerializer(serializers.ModelSerializer):
@@ -138,3 +161,10 @@ class ListRunningExperiment(serializers.ModelSerializer):
     class Meta:
         model = Docker
         fields = '__all__'
+
+
+class FilterDockerSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = Docker
+        fields = ["image_name", "name", "description",
+                  "subscribers", "background"]

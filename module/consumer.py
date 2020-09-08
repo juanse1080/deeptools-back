@@ -77,6 +77,7 @@ class BuildConsumer(WebsocketConsumer):
     }
 
     def connect(self):
+        print("CONNECT")
         self.room_name = self.scope["url_route"]["kwargs"]["pk"]
         self.room_group_name = f"{self.room_name}_building"
 

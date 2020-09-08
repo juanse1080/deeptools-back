@@ -344,6 +344,7 @@ class retrieveExperiment(generics.RetrieveAPIView):  # NOTE Show experiment
                 user=self.request.user, state__in=['executed', 'executing', 'error']).all()]
             print(experiment.user.id == self.request.user.id)
             data["owner"] = experiment.user.id == self.request.user.id
+            data["subscribe"] = self.request.user in experiment.docker.subscribers.all()
 
             for element in experiment.elements.all():
                 if element.kind in data["elements"]:

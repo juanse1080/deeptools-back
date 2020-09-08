@@ -129,7 +129,12 @@ class listModule(generics.ListAPIView):  # NOTE List module
         else:
             return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(self.serializer_class(dockers, many=True).data)
+        modules = []
+        for module in dockers:
+            module.background = f"{module.get_public_path()}/{module.background}"
+            modules.append(module)
+
+        return Response(self.serializer_class(modules, many=True).data)
 
 
 class retrieveModule(generics.RetrieveAPIView):  # NOTE Show module
@@ -160,6 +165,8 @@ class retrieveModule(generics.RetrieveAPIView):  # NOTE Show module
                     kind='input')[0].get_public_path()
                 exps.append(exp)
             data["experiments"] = RetriveExperiment(exps, many=True).data
+            data["no_subscribers"] = UserSerializer(User.objects.filter(
+                role='user').exclude(subscriptions=docker), many=True).data
             if self.request.user.id == docker.user.id:
                 data["users"] = UserSerializer(
                     docker.subscribers.all(), many=True).data
@@ -195,7 +202,8 @@ class deleteContainer(generics.DestroyAPIView):  # NOTE Delete module
             return Response("Module not found", status=status.HTTP_404_NOT_FOUND)
 
 
-class subscribeContainer(generics.UpdateAPIView):  # NOTE subscribe container
+# NOTE subscription container
+class subscriptionsContainer(generics.UpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def update(self, request, *args, **kwargs):
@@ -219,6 +227,41 @@ class subscribeContainer(generics.UpdateAPIView):  # NOTE subscribe container
                 return Response('add')
             else:
                 docker.subscribers.remove(self.request.user)
+                docker.save()
+                return Response('remove')
+
+        except ObjectDoesNotExist:
+            return Response("Module not found",
+                            status=status.HTTP_404_NOT_FOUND)
+
+
+class subscribersContainer(generics.UpdateAPIView):  # NOTE subscribe container
+    permission_classes = [permissions.IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        try:
+            if self.request.user.role == 'user':
+                return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'developer':
+                docker = Docker.objects.get(image_name=self.kwargs['pk'])
+                print(docker.user.id == self.request.user.id)
+                if not docker.user.id == self.request.user.id:
+                    return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
+
+            elif self.request.user.role == 'admin':
+                docker = Docker.objects.get(image_name=self.kwargs['pk'])
+
+            else:
+                return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+            print(self.request.data)
+            user = User.objects.get(id=self.request.data["id"])
+            if not docker.check_if_exist(user):
+                docker.subscribers.add(user)
+                docker.save()
+                return Response('add')
+            else:
+                docker.subscribers.remove(user)
                 docker.save()
                 return Response('remove')
 

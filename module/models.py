@@ -69,7 +69,7 @@ class Docker(models.Model):
     file = models.CharField(max_length=100, null=True)
     classname = models.CharField(max_length=100, null=True)
     view = models.CharField(max_length=1, blank=False)
-    extensions = models.CharField(max_length=250, null=True, blank=False)
+    extensions = models.CharField(max_length=250, null=True, blank=True)
 
     def check_if_exist(self, sub):
         return sub in self.subscribers.all()
