@@ -12,14 +12,15 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     role_choices = (
         ('admin', 'Administrador'),
-        ('creator', 'Creator'),
+        ('developer', 'Developer'),
         ('user', 'User'),
     )
-    role = models.CharField(max_length=10, choices=role_choices)
+    role = models.CharField(
+        max_length=10, choices=role_choices, default='user')
     birth = models.DateField(null=True)
     first_name = models.CharField(max_length=35)
     last_name = models.CharField(max_length=35)
-    photo = models.TextField(null=True, default='/media/users/3.jpg')
+    photo = models.TextField(null=True, default='/media/users/default.png')
     email = models.CharField(max_length=60, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

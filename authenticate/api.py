@@ -3,11 +3,31 @@ from django.db.models import Count, Q
 from django.db.models.functions import Concat, Lower
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import generics, mixins, authentication, permissions, status
+import os
+from django.conf import settings
 from rest_framework.response import Response
+from module.utils import handle_uploaded_file
 from module.models import Docker, Experiment, ElementData, Element
 from .models import Notification, User
-from .serializers import MyTokenObtainPairSerializer, ListModuleSerializer, ListExperimentSerializer, RetrieveExperimentSerializer, FilterDockerSerializers
-from .serializers import listSubscriptionSerializer, listTestSerializer, listRunningSerializer, listCompletedSerializer, ListActiveModules, NotificationsSerializer, UserSerializer
+from .serializers import MyTokenObtainPairSerializer, ListModuleSerializer, ListExperimentSerializer, RetrieveExperimentSerializer, FilterDockerSerializers, listSubscriptionSerializer, listTestSerializer, listRunningSerializer, listCompletedSerializer, ListActiveModules, NotificationsSerializer, UserSerializer, SignUpSeralizers, UpdateUserSerializer, UserRedux
+
+
+class SignUp(generics.CreateAPIView):
+    serializer_class = SignUpSeralizers
+
+    def create(self, request, *args, **kwargs):
+        if User.objects.filter(email=self.request.data["email"]).count() > 0:
+            return Response({"email": ["This email is in use, try with other"]}, status=status.HTTP_409_CONFLICT)
+        if not self.request.data["password"] == self.request.data["password2"]:
+            return Response({"password": ["Passwords do not match"]}, status=status.HTTP_409_CONFLICT)
+        temp = self.request.data.copy()
+        del temp["password2"]
+
+        serializer = self.serializer_class(data=temp)
+        if serializer.is_valid():
+            return Response(serializer.validated_data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
 
 
 class LoginAPI(TokenObtainPairView):  # NOTE Login
@@ -189,6 +209,48 @@ class listNotifications(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         notifications = self.request.user.notifications.all().order_by('-created_at')
         return Response(self.serializer_class(notifications, many=True).data)
+
+
+class UserInfo(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        return Response(self.serializer_class(self.request.user).data)
+
+
+class UpdateUser(generics.UpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UpdateUserSerializer
+
+    def update(self, request, *args, **kwargs):
+        data = dict()
+        user = self.request.user
+        for key, value in self.request.data.items():
+            print(key, value, type(value))
+            data[key] = value
+
+        if "photo" in data:
+            path = f'{settings.MEDIA_ROOT}/users'
+            if os.path.exists(user.photo) and not user.photo == "/media/users/default.png":
+                os.remove(user.photo)
+            name = handle_uploaded_file(data["photo"], path, user.id)
+            data["photo"] = f"/media/users/{name}"
+
+        if "email" in data:
+            user_with_email = User.objects.filter(email=data["email"])
+            if user_with_email.count() == 1:
+                if not user_with_email.get().id == user.id:
+                    return Response({"email": ["This email is used"]}, status=status.HTTP_409_CONFLICT)
+
+        serializer = self.serializer_class(data=data)
+        if serializer.is_valid():
+            for key, value in data.items():
+                setattr(user, key, value)
+            user.save()
+            return Response(UserRedux(user).data)
+        else:
+            return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
 
 
 class profile(generics.RetrieveAPIView):

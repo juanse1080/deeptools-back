@@ -2,6 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, Notification
+from django.contrib.auth.hashers import make_password
 from module.models import *
 
 
@@ -9,7 +10,23 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "first_name", "last_name",
-                  "photo", "role", "owner", "subscriptions"]
+                  "photo", "role", "owner", "subscriptions", "email"]
+
+
+class UpdateUserSerializer(serializers.ModelSerializer):
+    email = serializers.CharField(max_length=60, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name",
+                  "photo", "email"]
+
+
+class UserRedux(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "role",
+                  "photo", "id"]
 
 
 class RetrieveRecordSerializer(serializers.ModelSerializer):
@@ -28,17 +45,39 @@ class MyTokenObtainPairSerializer(TokenObtainSerializer):
         refresh = self.get_token(self.user)
 
         data['token'] = {}
+        data['token']['refresh'] = str(refresh)
+        data['token']['access'] = str(refresh.access_token)
+
+        data['user'] = UserRedux(self.user).data
+
+        return data
+
+
+class SignUpSeralizers(serializers.ModelSerializer):
+
+    def validate(self, attrs):
+        print("VALIDATE: ", attrs)
+        data = super().validate(attrs)
+        user = User.objects.create(**attrs)
+        user.password = make_password(attrs['password'])
+        user.save()
+        refresh = RefreshToken.for_user(user)
+
+        data['token'] = {}
         data['user'] = {}
 
         data['token']['refresh'] = str(refresh)
         data['token']['access'] = str(refresh.access_token)
-        data['user']['first_name'] = self.user.first_name
-        data['user']['last_name'] = self.user.last_name
-        data['user']['role'] = self.user.role
-        data['user']['photo'] = self.user.photo
-        data['user']['id'] = self.user.id
-
+        data['user']['first_name'] = user.first_name
+        data['user']['last_name'] = user.last_name
+        data['user']['role'] = user.role
+        data['user']['photo'] = user.photo
+        data['user']['id'] = user.id
         return data
+
+    class Meta:
+        model = User
+        fields = "__all__"
 
 
 # NOTE list subscriptions

@@ -6,7 +6,7 @@ from .api import *
 from .views import template
 
 urlpatterns = [
-    path('sign-in', template, name='template'),
+    path('sign-up/', SignUp.as_view(), name='sign_up'),
     path('login/', LoginAPI.as_view(), name='token_obtain_pair'),
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
@@ -22,6 +22,8 @@ urlpatterns = [
     path('notifications/<int:pk>', UpdateNotification.as_view(),
          name='show_notification'),
     path('notifications/', listNotifications.as_view(), name='notifications'),
+    path('profile/edit', UpdateUser.as_view(), name='profile'),
     path('profile/<int:pk>', profile.as_view(), name='profile'),
+    path('profile', UserInfo.as_view(), name='profile'),
     path('find', findAll.as_view(), name='find'),
 ]

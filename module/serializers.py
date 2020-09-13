@@ -120,7 +120,6 @@ class CreateModuleSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         temp = validated_data.copy()
-        print("######3", temp)
         del temp["elements"]
         with transaction.atomic():
             docker = Docker(**temp)
