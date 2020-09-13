@@ -20,9 +20,10 @@ from django.contrib import admin
 from django.urls import path
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    url(r'^module/', include('module.urls')),
-    url(r'^accounts/', include('authenticate.urls'))
+    # path('admin/', admin.site.urls),
+    path('modules/', include('module.urls')),
+    path('accounts/', include('authenticate.urls')),
+    path('', include('front.urls'))
 ]
 
 if settings.DEBUG:  # new
