@@ -2,15 +2,8 @@ from django.conf.urls import include, url
 from django.urls import path
 from . import views
 from .api import module, experiment
-# from django.contrib.auth.views import login
 
 urlpatterns = [
-    ############# Nuevas rutas ######################
-
-
-
-
-
     # NOTE: URLS EXPERIMENT
     path('run/<str:pk>/examples',
          experiment.listExamplesModule.as_view(), name="list_examples"),
