@@ -20,9 +20,9 @@ urlpatterns = [
          experiment.DeleteElementData.as_view(), name="remove_element"),
 
     # NOTE: URLS MODULE
-    path('check', module.checkPermissionsAPI, name="check_permissions"),
-    path('images', module.listImages.as_view(), name="list_images"),
-    path('create', module.createModule.as_view(), name="create_module"),
+    path('check/', module.checkPermissionsAPI, name="check_permissions"),
+    path('images/', module.listImages.as_view(), name="list_images"),
+    path('create/', module.createModule.as_view(), name="create_module"),
     path('stop/<str:pk>', module.stopContainer.as_view(), name="stop_container"),
     path('start/<str:pk>', module.startContainer.as_view(), name="start_container"),
     path('delete/<str:pk>', module.deleteContainer.as_view(),

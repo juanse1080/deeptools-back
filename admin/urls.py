@@ -23,9 +23,10 @@ urlpatterns = [
     # path('admin/', admin.site.urls),
     path('modules/', include('module.urls')),
     path('accounts/', include('authenticate.urls')),
-    path('', include('front.urls'))
 ]
 
 if settings.DEBUG:  # new
     urlpatterns += static(settings.MEDIA_URL,
                           document_root=settings.MEDIA_ROOT)
+
+urlpatterns += [path('', include('front.urls'))]

@@ -4,6 +4,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, Notification
 from django.contrib.auth.hashers import make_password
 from module.models import *
+from django.contrib.auth.models import Group
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -60,7 +61,10 @@ class SignUpSeralizers(serializers.ModelSerializer):
         data = super().validate(attrs)
         user = User.objects.create(**attrs)
         user.password = make_password(attrs['password'])
+        if user.role in ["user", "developer"]:
+            user.groups.add(Group.objects.get(name=user.role))
         user.save()
+
         refresh = RefreshToken.for_user(user)
 
         data['token'] = {}

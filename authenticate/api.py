@@ -304,7 +304,7 @@ class dashboard(generics.RetrieveAPIView):
         try:
             data = {}
             data["running"] = listRunningSerializer(self.request.user.experiments.filter(
-                state='executing', docker__state='active').order_by('-created_at')[0:10], many=True).data
+                state='executing').order_by('-created_at')[0:10], many=True).data
             data["last"] = listCompletedSerializer(self.request.user.experiments.filter(
                 state='executed').order_by('-created_at')[0:10], many=True).data
 
@@ -317,7 +317,7 @@ class dashboard(generics.RetrieveAPIView):
                     modules.append(module)
             elif self.request.user.role == "developer":
                 modules = []
-                for module in Docker.objects.filter(user=self.request.user).order_by('-created_at')[0:10]:
+                for module in Docker.objects.filter(user=self.request.user).exclude(state="deleted").order_by('-created_at')[0:10]:
                     module.image = module.subscribers.count()
                     module.background = f"{module.get_public_path()}/{module.background}"
                     modules.append(module)
@@ -332,10 +332,6 @@ class findAll(generics.UpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         dockers = []
-        print(
-            Docker.objects.annotate(name_lower=Lower('name'), description_lower=Lower('description')).filter(
-                Q(Q(name_lower__contains=self.request.data["value"].lower()) | Q(description_lower__contains=self.request.data["value"])), state='active').query
-        )
         for docker in Docker.objects.annotate(name_lower=Lower('name'), description_lower=Lower('description')).filter(
                 Q(Q(name_lower__contains=self.request.data["value"].lower()) | Q(description_lower__contains=self.request.data["value"])), state='active')[:10]:
             docker.background = f"{docker.get_public_path()}/{docker.background}"
