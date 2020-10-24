@@ -198,7 +198,6 @@ class listModules(generics.ListAPIView):
             module.image = module.subscribers.count()
             module.background = f"{module.get_public_path()}/{module.background}"
         data = self.serializer_class(all, many=True).data
-        # print(data[0])
         return Response(data)
 
 
@@ -227,13 +226,13 @@ class UpdateUser(generics.UpdateAPIView):
         data = dict()
         user = self.request.user
         for key, value in self.request.data.items():
-            print(key, value, type(value))
             data[key] = value
 
         if "photo" in data:
             path = f'{settings.MEDIA_ROOT}/users'
-            if os.path.exists(user.photo) and not user.photo == "/media/users/default.png":
-                os.remove(user.photo)
+            path_image = os.path.join(path, user.photo.split('/')[-1])
+            if os.path.exists(path_image) and not user.photo == "/media/users/default.png":
+                os.remove(path_image)
             name = handle_uploaded_file(data["photo"], path, user.id)
             data["photo"] = f"/media/users/{name}"
 
@@ -264,7 +263,7 @@ class profile(generics.RetrieveAPIView):
                 return Response("Permissions denied", status=status.HTTP_401_UNAUTHORIZED)
             if self.request.user.role == 'developer' and not self.request.user.id == self.kwargs['pk']:
                 _is = False
-                for docker in self.request.user.owner.exclude(state='active'):
+                for docker in self.request.user.owner.all():
                     if user in docker.subscribers.all():
                         _is = True
                         break
@@ -311,7 +310,6 @@ class dashboard(generics.RetrieveAPIView):
             if self.request.user.role == "user":
                 modules = []
                 for module in Docker.objects.filter(state='active').exclude(subscribers=self.request.user).order_by('-created_at')[0:10]:
-                    # print(type(module))
                     module.image = module.subscribers.count()
                     module.background = f"{module.get_public_path()}/{module.background}"
                     modules.append(module)

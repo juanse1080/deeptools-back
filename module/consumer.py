@@ -21,8 +21,6 @@ class BuildConsumer(WebsocketConsumer):
         module = Docker.objects.get(image_name=self.room_name)
         generator, steps = module.build_docker()
         for description in generator:
-            print(type(description))
-            print(description)
             aux = json.loads(description.decode('utf-8'))
             if "stream" in aux:
                 if aux["stream"] == 'error':
@@ -31,7 +29,6 @@ class BuildConsumer(WebsocketConsumer):
                         'description': steps[index][-1],
                         'state': 'error'
                     }
-                    print(content)
                     item.append(content)
                     self.progress_group(item)
                     index += 1
@@ -47,7 +44,6 @@ class BuildConsumer(WebsocketConsumer):
                             'description': steps[index - 1][-1],
                             'state': 'execute'
                         }
-                        print(content)
                         item.append(content)
                         self.progress_group(item)
 
@@ -57,7 +53,6 @@ class BuildConsumer(WebsocketConsumer):
                             'description': step,
                             'state': 'execute'
                         }
-                        print(content)
                         item.append(content)
                         self.progress_group(item)
 
@@ -77,7 +72,6 @@ class BuildConsumer(WebsocketConsumer):
     }
 
     def connect(self):
-        print("CONNECT")
         self.room_name = self.scope["url_route"]["kwargs"]["pk"]
         self.room_group_name = f"{self.room_name}_building"
 
@@ -115,7 +109,6 @@ def obj_to_data(experiment, elements):
     outputs = experiment.docker.elements_type.filter(kind='output')
     path = '{0}/media/user_{1}/exp_{2}/outputs/'.format(
         experiment.docker.workdir, experiment.user.id, experiment.id)
-    print(elements.outputs)
     if outputs.count() == 1:
         if int(outputs.get().len) > 0:
             for output in elements.outputs.outputs:
@@ -208,7 +201,6 @@ class ExperimentConsumer(WebsocketConsumer):
                 record.write()
                 self.progress_group([content])
 
-            print(data.elements)
             obj_to_data(experiment, data.elements)
 
             content = {
@@ -235,8 +227,6 @@ class ExperimentConsumer(WebsocketConsumer):
                 'owner': experiment.user
             }
 
-            print(notification_data)
-
             notification = Notification.objects.create(**notification_data)
             notification.send_notification()
 
@@ -262,13 +252,8 @@ class ExperimentConsumer(WebsocketConsumer):
                 'owner': experiment.docker.user
             }
 
-            print(notification_data)
-
             notification = Notification.objects.create(**notification_data)
             notification.send_notification()
-
-            print('###### CreateUser failed with {0}: {1}'.format(
-                e.code(), e.details()), e, dir(e))
 
     commands = {
         'execute': execute,
@@ -323,7 +308,6 @@ class NotificationsConsumer(WebsocketConsumer):
         user = User.objects.get(id=self.user_name)
         content = NotificationsSerializer(
             user.notifications.filter(is_active=True).order_by('-created_at'), many=True).data
-        print(content)
 
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
