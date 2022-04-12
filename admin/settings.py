@@ -113,7 +113,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [('127.0.0.1', 6379)],
+            "hosts": [('127.0.0.1', 6380)],
             'capacity': 300
         }
     },
@@ -128,7 +128,7 @@ DATABASES = {
         'USER': 'root',  # Your username
         'PASSWORD': 'password',  # Your password in db
         'HOST': '127.0.0.1',
-        'PORT': '3306',
+        'PORT': '3307',
     }
 }
 
