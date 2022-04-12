@@ -26,8 +26,7 @@ SECRET_KEY = '4yksl!_2$*u@o#!pf_5xy*(gl=1gt=i1xryh+h$yboiid)5$$x'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.10', 'localhost',
-                 '192.168.1.19', '192.168.0.21', '192.168.0.26']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -113,7 +112,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [('127.0.0.1', 6379)],
+            "hosts": [('cache', 6379)],
             'capacity': 300
         }
     },
@@ -125,9 +124,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'admin',
-        'USER': 'root',  # Your username
-        'PASSWORD': 'password',  # Your password in db
-        'HOST': '127.0.0.1',
+        'USER': 'root',
+        'PASSWORD': '',
+        'HOST': 'db',
         'PORT': '3306',
     }
 }
@@ -179,4 +178,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 AUTH_USER_MODEL = 'authenticate.User'
 
-ENV_ROOT = '/home/juanarcon/Proyectos/Project/venv/lib/python3.8/site-packages/'
+ENV_ROOT = '/opt/venv/lib/python3.8/site-packages'

@@ -179,7 +179,10 @@ class ExperimentConsumer(WebsocketConsumer):
         grpc = importlib.import_module('grpc')
         services = importlib.import_module(
             '{}.protobuf_pb2_grpc'.format(experiment.docker.id))
-        channel = grpc.insecure_channel(experiment.docker.ip)
+        print(f"{experiment.docker.id}{experiment.docker.ip}")
+        channel = grpc.insecure_channel(
+            f"{experiment.docker.id}{experiment.docker.ip}")
+        # channel = grpc.insecure_channel(experiment.docker.ip)
         stub = services.ServerStub(channel)
 
         try:
@@ -231,6 +234,7 @@ class ExperimentConsumer(WebsocketConsumer):
             notification.send_notification()
 
         except grpc.RpcError as e:
+            print("###########", e)
             pro = experiment.records.all(
             )[-1].progress if experiment.records.count() > 0 else 0
             content = {

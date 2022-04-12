@@ -66,9 +66,10 @@ class createModule(generics.CreateAPIView):  # NOTE Create module
             return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)
 
         try:
-            exist_classname = client.containers.run(
+            exist_classname = client.containers.run(  
                 remove=True, image=data["image"], working_dir=data["workdir"], command="python {0}".format(data["file"]))
         except docker_env.errors.ContainerError as error:
+            print(error)
             return Response({"classname": ["{0} class has trouble running, verify document can run".format(data["classname"])]}, status=status.HTTP_409_CONFLICT)
         except docker_env.errors.ImageNotFound as error:
             return Response({"image": ["Image not found"]}, status=status.HTTP_409_CONFLICT)

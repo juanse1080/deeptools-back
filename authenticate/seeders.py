@@ -53,45 +53,45 @@ def create_seeder():
             group.permissions.add(Permission.objects.get(codename=permission))
         group.save()
 
-    # User.objects.create(
-    #     email='admin@gmail.com',
-    #     password=make_password('clave'),
-    #     role='admin',
-    #     photo="/media/users/3.jpg"
-    #     is_superuser=True,
-    #     is_staff=True,
-    #     is_active=True,
-    #     birth='1997-09-14',
-    #     first_name='Juan',
-    #     last_name='Marcon',
-    # )
+    User.objects.create(
+        email='admin@gmail.com',
+        password=make_password('clave'),
+        role='admin',
+        photo="/media/users/3.jpg",
+        is_superuser=True,
+        is_staff=True,
+        is_active=True,
+        birth='1997-09-14',
+        first_name='Juan',
+        last_name='Marcon',
+    )
 
-    # developer = User.objects.create(
-    #     email='developer@gmail.com',
-    #     password=make_password('clave'),
-    #     role='developer',
-    #     photo="/media/users/2.jpg"
-    #     is_superuser=False,
-    #     is_staff=False,
-    #     is_active=True,
-    #     birth='1997-09-14',
-    #     first_name='Edgar',
-    #     last_name='Rangel',
-    # )
-    # developer.groups.add(Group.objects.get(name='developer'))
-    # developer.save()
+    developer = User.objects.create(
+        email='developer@gmail.com',
+        password=make_password('clave'),
+        role='developer',
+        photo="/media/users/2.jpg",
+        is_superuser=False,
+        is_staff=False,
+        is_active=True,
+        birth='1997-09-14',
+        first_name='Edgar',
+        last_name='Rangel',
+    )
+    developer.groups.add(Group.objects.get(name='developer'))
+    developer.save()
 
-    # user = User.objects.create(
-    #     email='user@gmail.com',
-    #     password=make_password('clave'),
-    #     role='user',
-    #     photo="/media/users/3.jpg"
-    #     is_superuser=False,
-    #     is_staff=False,
-    #     is_active=True,
-    #     birth='1997-09-14',
-    #     first_name='Oscar',
-    #     last_name='Mendoza',
-    # )
-    # user.groups.add(Group.objects.get(name='user'))
-    # user.save()
+    user = User.objects.create(
+        email='user@gmail.com',
+        password=make_password('clave'),
+        role='user',
+        photo="/media/users/3.jpg",
+        is_superuser=False,
+        is_staff=False,
+        is_active=True,
+        birth='1997-09-14',
+        first_name='Oscar',
+        last_name='Mendoza',
+    )
+    user.groups.add(Group.objects.get(name='user'))
+    user.save()

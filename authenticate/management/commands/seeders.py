@@ -22,17 +22,20 @@ class Command(BaseCommand):
             try:
                 import_elements.append(import_module(seeder_module_name))
                 names.append(seeder_module_name)
-                self.stdout.write(self.style.SUCCESS("imported %s" % seeder_module_name))
+                self.stdout.write(self.style.SUCCESS(
+                    "imported %s" % seeder_module_name))
             except ImportError as error:
-                
+
                 if seeder_module_name not in str(error):
-                    self.stdout.write(self.style.ERROR('Error in  %s: %s' % (seeder_module_name, error)))
+                    self.stdout.write(self.style.ERROR(
+                        'Error in  %s: %s' % (seeder_module_name, error)))
                     exc_type, exc_obj, tb = sys.exc_info()
                     print(exc_type)
                     print(exc_obj)
                     traceback.print_exc()
                 else:
-                    self.stdout.write(self.style.ERROR('seeders.py does not exist in module %s' % app.module.__name__))
+                    self.stdout.write(self.style.ERROR(
+                        'seeders.py does not exist in module %s' % app.module.__name__))
 
         print("\n")
 
@@ -40,16 +43,14 @@ class Command(BaseCommand):
             try:
                 seeder.create_seeder()
                 self.stdout.write(self.style.SUCCESS(
-                '%s create_seeder() executed' % names[item]))
+                    '%s create_seeder() executed' % names[item]))
             except IntegrityError as error:
                 self.stdout.write(self.style.WARNING(
-                error))
+                    error))
             except:
                 self.stdout.write(self.style.ERROR(
-                'Error during execute %s.py' % names[item]))
+                    'Error during execute %s.py' % names[item]))
                 exc_type, exc_obj, tb = sys.exc_info()
                 print(exc_type)
                 print(exc_obj)
                 traceback.print_exc()
-            
-            

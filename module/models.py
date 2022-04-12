@@ -243,6 +243,7 @@ class Docker(models.Model):
                 command='python server.py',
                 detach=True,
                 name=self.image_name,
+                network="admin",
                 # ports={50051: 50051},
                 remove=True,
                 working_dir=self.workdir,
@@ -253,7 +254,7 @@ class Docker(models.Model):
                 }
             )
             container = self.get_container()
-            self.ip = '%s:50051' % container.attrs['NetworkSettings']['IPAddress']
+            self.ip = ':50051'
             self.state = 'builded' if builded else 'active'
             self.save()
             return container

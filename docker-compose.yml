@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    volumes:
+      - .:/code
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - admin
+    ports:
+      - 8000:8000
+    image: app:django
+    container_name: app
+    command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      - db
+      - cache
+
+  db:
+    container_name: db
+    image: mysql:8.0.20
+    environment:
+      MYSQL_DATABASE: "admin"
+      MYSQL_ALLOW_EMPTY_PASSWORD: "true"
+    volumes:
+      - /home/juanmarcon/Container/data/mysql-8.0.20/db:/var/lib/mysql
+    networks:
+      - admin
+    ports:
+      - 3306:3306
+
+  cache:
+    container_name: cache
+    image: redis:5.0.7
+    networks:
+      - admin
+    ports:
+      - "6379:6379"
+    volumes:
+      - /home/juanmarcon/Container:/data
+
+networks:
+  admin:
+    name: admin
+    driver: bridge
