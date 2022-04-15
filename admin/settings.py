@@ -124,8 +124,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'admin',
-        'USER': 'root',
-        'PASSWORD': '',
+        'USER': 'user',
+        'PASSWORD': 'password',
         'HOST': 'db',
         'PORT': '3306',
     }
@@ -178,4 +178,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 AUTH_USER_MODEL = 'authenticate.User'
 
-ENV_ROOT = '/opt/venv/lib/python3.8/site-packages'
+ENV_ROOT = '/home/juanse1080/venv/lib/python3.8/site-packages'

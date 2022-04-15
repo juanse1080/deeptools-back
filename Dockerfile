@@ -6,7 +6,7 @@ WORKDIR /code
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends gcc libc-dev python3-dev default-libmysqlclient-dev default-mysql-client
 
-ENV VIRTUAL_ENV=/opt/venv
+ENV VIRTUAL_ENV=/home/juanse1080/venv
 RUN python3 -m venv $VIRTUAL_ENV
 RUN echo $VIRTUAL_ENV/bin:$PATH
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"

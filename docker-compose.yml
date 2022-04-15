@@ -5,14 +5,15 @@ services:
     build: .
     volumes:
       - .:/code
-      - /var/run/docker.sock:/var/run/docker.sock
+      # - /var/run/docker.sock:/var/run/docker.sock
+      - /run/user/1002/docker.sock:/var/run/docker.sock
     networks:
       - admin
     ports:
       - 8000:8000
     image: app:django
     container_name: app
-    command: python manage.py runserver 0.0.0.0:8001
+    command: python manage.py runserver 0.0.0.0:8000
     depends_on:
       - db
       - cache
@@ -22,9 +23,12 @@ services:
     image: mysql:8.0.20
     environment:
       MYSQL_DATABASE: "admin"
-      MYSQL_ALLOW_EMPTY_PASSWORD: "true"
+      MYSQL_USER: "user"
+      MYSQL_PASSWORD: "password"
+      MYSQL_ROOT_PASSWORD: "password"
     volumes:
-      - /home/juanmarcon/Container/data/mysql-8.0.20/db:/var/lib/mysql
+      # - /home/juanmarcon/Container/data/db:/var/lib/mysql
+      - /home/juanse1080/Container/data/db:/var/lib/mysql
     networks:
       - admin
     ports:
@@ -38,7 +42,8 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - /home/juanmarcon/Container:/data
+      # - /home/juanmarcon/Container/data/cache:/data
+      - /home/juanse1080/Container/data/cache:/data
 
 networks:
   admin:
