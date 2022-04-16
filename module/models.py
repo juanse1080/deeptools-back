@@ -97,6 +97,7 @@ class Docker(models.Model):
         return f'{settings.MEDIA_URL}{self.id}'
 
     def get_path(self):
+        print(f'{settings.MEDIA_ROOT}/{self.id}')
         return f'{settings.MEDIA_ROOT}/{self.id}'
 
     def create_folders(self):
@@ -184,7 +185,7 @@ class Docker(models.Model):
             print(exc_type)
             print(exc_obj)
             traceback.print_exc()
-            # self.delete()
+            self.delete()
         self.save()
         return True
 
@@ -242,6 +243,7 @@ class Docker(models.Model):
                 image=self.image_name,
                 command='python server.py',
                 detach=True,
+                # gpus="all",
                 name=self.image_name,
                 network="admin",
                 # ports={50051: 50051},
@@ -255,7 +257,7 @@ class Docker(models.Model):
             )
             container = self.get_container()
             self.ip = ':50051'
-            self.state = 'builded' if builded else 'active'
+            self.state = '  ' if builded else 'active'
             self.save()
             return container
         except docker_env.errors.ContainerError as error:

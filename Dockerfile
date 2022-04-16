@@ -1,7 +1,7 @@
 FROM python:3.8
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /code
+WORKDIR /home/juanse1080/Deploy
 
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends gcc libc-dev python3-dev default-libmysqlclient-dev default-mysql-client

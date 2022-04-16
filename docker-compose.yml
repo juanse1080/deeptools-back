@@ -4,7 +4,7 @@ services:
   app:
     build: .
     volumes:
-      - .:/code
+      - .:/home/juanse1080/Deploy
       # - /var/run/docker.sock:/var/run/docker.sock
       - /run/user/1002/docker.sock:/var/run/docker.sock
     networks:
