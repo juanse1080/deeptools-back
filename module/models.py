@@ -257,7 +257,7 @@ class Docker(models.Model):
             )
             container = self.get_container()
             self.ip = ':50051'
-            self.state = '  ' if builded else 'active'
+            self.state = 'builded' if builded else 'active'
             self.save()
             return container
         except docker_env.errors.ContainerError as error:
