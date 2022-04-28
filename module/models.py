@@ -175,6 +175,11 @@ class Docker(models.Model):
                     'proto':  'protobuf.proto'.format(self.id)
                 })
 
+            shutil.copytree('%(media)s/%(id)s/%(id)s' % {
+                'media': settings.MEDIA_ROOT, 'id': self.id
+            },
+                f"{settings.BASE_DIR}/local/{self.id}"
+            )
             shutil.move('%(media)s/%(id)s/%(id)s' % {
                 'media': settings.MEDIA_ROOT, 'id': self.id
             },
@@ -250,8 +255,8 @@ class Docker(models.Model):
                 remove=True,
                 working_dir=self.workdir,
                 volumes={
-                    '{}/experiments'.format(self.get_path()): {
-                        'bind': '{}/media'.format(self.workdir), 'mode': 'rw'
+                    f'{settings.MEDIA_HOST}/{self.id}/experiments': {
+                        'bind': f'{self.workdir}/media', 'mode': 'rw'
                     }
                 }
             )
@@ -338,7 +343,7 @@ class Experiment(models.Model):
     def create_workdir(self, outputs=False):
         os.makedirs(self.inputs(), 0o777)
         open(self.get_logs(), "x")
-        if outputs:
+        if outputs and not os.path.isdir(self.outputs()):
             os.makedirs(self.outputs(), 0o777)
 
     def inputs(self):
@@ -375,6 +380,8 @@ class Experiment(models.Model):
             outputs = self.docker.elements_type.filter(kind='output')
             have_output = outputs.count() == 1
 
+            outputs_data = ''
+
             if have_output:
                 outputs_data = '{0}/media/user_{1}/exp_{2}/outputs'.format(
                     self.docker.workdir, self.user.id, self.id)
@@ -391,8 +398,9 @@ class Experiment(models.Model):
                     return {'inputs': get_inputs_obj(inputs, len), 'output': objects.Output(value=outputs)}
                 else:
                     return {'inputs': get_inputs_obj(inputs, len)}
-
-            print(createIn(inputs_data, outputs_data, int(input.len), have_output))
+            if have_output:
+                print(createIn(inputs_data, outputs_data,
+                      int(input.len), have_output))
 
             return objects.In(
                 **createIn(inputs_data, outputs_data, int(input.len), have_output)

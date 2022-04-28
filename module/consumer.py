@@ -235,8 +235,10 @@ class ExperimentConsumer(WebsocketConsumer):
 
         except grpc.RpcError as e:
             print("###########", e)
+            print("###########", experiment.records.all(),
+                  experiment.records.count())
             pro = experiment.records.all(
-            )[-1].progress if experiment.records.count() > 0 else 0
+            ).last().progress if experiment.records.count() > 0 else 0
             content = {
                 'progress': pro,
                 'description': "An error occurred in the server, our team will contact you when it is solved",

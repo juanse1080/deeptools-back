@@ -5,8 +5,8 @@ services:
     build: .
     volumes:
       - .:/home/juanse1080/Deploy
-      # - /var/run/docker.sock:/var/run/docker.sock
-      - /run/user/1002/docker.sock:/var/run/docker.sock
+      - "${SOCKET}:/var/run/docker.sock"
+      # - /run/user/1002/docker.sock:/var/run/docker.sock
     networks:
       - admin
     ports:
@@ -27,8 +27,8 @@ services:
       MYSQL_PASSWORD: "password"
       MYSQL_ROOT_PASSWORD: "password"
     volumes:
-      # - /home/juanmarcon/Container/data/db:/var/lib/mysql
-      - /home/juanse1080/Container/data/db:/var/lib/mysql
+      - "${DB}:/var/lib/mysql"
+      # - /home/juanse1080/Container/data/db:/var/lib/mysql
     networks:
       - admin
     ports:
@@ -37,13 +37,13 @@ services:
   cache:
     container_name: cache
     image: redis:5.0.7
+    volumes:
+      - "${CACHE}:/data"
+      # - /home/juanse1080/Container/data/cache:/data
     networks:
       - admin
     ports:
       - "6379:6379"
-    volumes:
-      # - /home/juanmarcon/Container/data/cache:/data
-      - /home/juanse1080/Container/data/cache:/data
 
 networks:
   admin:

@@ -40,6 +40,7 @@ class createExperiment(generics.CreateAPIView):  # NOTE Create Experiment
 
             input = docker.elements_type.filter(kind='input').get()
             output = docker.elements_type.filter(kind='output')
+            print(output.count(), input.len)
 
             output = False if output.count() == 0 else True
 
@@ -52,6 +53,9 @@ class createExperiment(generics.CreateAPIView):  # NOTE Create Experiment
             else:
                 experiments = Experiment.objects.filter(
                     docker=docker, user=self.request.user, state='created')
+                print("output")
+                print(experiments.count())
+                print(output)
                 if experiments.count() == 0:
                     experiment = Experiment.objects.create(
                         docker=docker, user=self.request.user, state='created')
