@@ -341,10 +341,13 @@ class Experiment(models.Model):
         return f"{self.get_public_path()}/logs.txt"
 
     def create_workdir(self, outputs=False):
-        os.makedirs(self.inputs(), 0o777)
-        open(self.get_logs(), "x")
+        print(outputs)
+        if not os.path.isdir(self.inputs()):
+            os.makedirs(self.inputs(), 0o777)
         if outputs and not os.path.isdir(self.outputs()):
             os.makedirs(self.outputs(), 0o777)
+        if not os.path.isfile(self.get_logs()):
+            open(self.get_logs(), "x")
 
     def inputs(self):
         return f"{self.get_workdir()}/inputs"
